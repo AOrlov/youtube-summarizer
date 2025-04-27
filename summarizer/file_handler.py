@@ -124,7 +124,7 @@ class FileHandler:
             Path to the summary file if found, None otherwise
         """
         try:
-            pattern = f"summary_{video_id}_*.txt"
+            pattern = f"summary_{video_id}_*.md"
             files = list(self.output_dir.glob(pattern))
             if not files:
                 return None

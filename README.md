@@ -10,6 +10,8 @@ A Python application that extracts transcripts from YouTube videos and generates
 - Configurable summary length
 - Command-line interface
 - Comprehensive logging
+- Web interface
+- Docker support
 
 ## Installation
 
@@ -36,6 +38,22 @@ export GEMINI_API_KEY="your-api-key-here"
 ```
 
 ## Usage
+
+### Web Interface
+
+The application can be run as a web service using Docker:
+
+1. Build and run the Docker container:
+```bash
+docker-compose up --build
+```
+
+2. Access the web interface at http://localhost:5000
+
+The web interface provides a simple form where you can:
+- Enter a YouTube video URL
+- Optionally specify the maximum number of tokens for the summary
+- Submit to generate a summary
 
 ### Command Line Interface
 
@@ -92,6 +110,7 @@ The application uses Python's built-in logging module with the following configu
 - google-generativeai
 - youtube-transcript-api
 - pytest (for development)
+- Flask (for web interface)
 
 ## License
 
