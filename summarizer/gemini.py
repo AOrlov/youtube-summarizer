@@ -49,7 +49,9 @@ class GeminiSummarizer:
         Returns:
             The formatted prompt
         """
-        return f"""Please summarize the following transcript in {self.language}:
+        return f"""Please summarize as markdown the following transcript.
+If you notice from the context any links to books or authors, add concise descriptions of the ideas and concepts they represent to the summary.
+Output in {self.language} language:
 
 {transcript}
 
@@ -71,7 +73,6 @@ Summary:"""
         """
         try:
             prompt = self._create_prompt(transcript)
-            
             # Configure generation parameters
             generation_config = genai.types.GenerationConfig(
                 temperature=0.7,

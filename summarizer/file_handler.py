@@ -58,7 +58,7 @@ class FileHandler:
     
     def save_summary(self, video_id: str, summary: str, metadata: Optional[Dict[str, Any]] = None) -> Path:
         """
-        Save a summary to a file.
+        Save a summary to a file in Markdown format.
         
         Args:
             video_id: YouTube video ID
@@ -76,23 +76,29 @@ class FileHandler:
         try:
             # Create filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"summary_{video_id}_{timestamp}.txt"
+            filename = f"summary_{video_id}_{timestamp}.md"
             file_path = self.output_dir / filename
             
             # Validate path
             self._validate_path(file_path)
             
-            # Prepare content
-            content = {
-                "video_id": video_id,
-                "summary": summary,
-                "metadata": metadata or {},
-                "timestamp": timestamp
-            }
+            # Prepare markdown content
+            markdown_content = f"""# Summary for Video {video_id}
+
+## Summary
+{summary}
+
+## Metadata
+"""
+            if metadata:
+                for key, value in metadata.items():
+                    markdown_content += f"- **{key}**: {value}\n"
+            
+            markdown_content += f"\nGenerated on: {timestamp}"
             
             # Write to file
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(content, f, indent=2, ensure_ascii=False)
+                f.write(markdown_content)
             
             logger.info(f"Summary saved to: {file_path}")
             return file_path
