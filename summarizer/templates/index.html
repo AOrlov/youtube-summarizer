@@ -40,10 +40,6 @@
                                 <label for="videoUrl" class="form-label">YouTube Video URL</label>
                                 <input type="url" class="form-control" id="videoUrl" required>
                             </div>
-                            <div class="mb-3">
-                                <label for="maxTokens" class="form-label">Maximum Tokens (optional)</label>
-                                <input type="number" class="form-control" id="maxTokens" min="1">
-                            </div>
                             <button type="submit" class="btn btn-primary">Summarize</button>
                         </form>
                     </div>
@@ -51,8 +47,17 @@
 
                 <div class="card mt-4" id="summaryCard" style="display: none;">
                     <div class="card-body">
-                        <h5 class="card-title">Summary</h5>
                         <div class="summary-container" id="summary"></div>
+                    </div>
+                </div>
+
+                <div class="card mt-4" id="progressCard" style="display: none;">
+                    <div class="card-body">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                                style="width: 100%"></div>
+                        </div>
+                        <p class="text-center mt-2">Processing video summary...</p>
                     </div>
                 </div>
             </div>
@@ -64,9 +69,13 @@
             e.preventDefault();
 
             const videoUrl = document.getElementById('videoUrl').value;
-            const maxTokens = document.getElementById('maxTokens').value;
             const summaryCard = document.getElementById('summaryCard');
+            const progressCard = document.getElementById('progressCard');
             const summaryElement = document.getElementById('summary');
+
+            // Show progress bar and hide summary card
+            progressCard.style.display = 'block';
+            summaryCard.style.display = 'none';
 
             try {
                 const response = await fetch('/api/summarize', {
@@ -75,8 +84,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        video_url: videoUrl,
-                        max_tokens: maxTokens ? parseInt(maxTokens) : undefined
+                        video_url: videoUrl
                     })
                 });
 
@@ -91,6 +99,9 @@
             } catch (error) {
                 alert('An error occurred while processing your request.');
                 console.error('Error:', error);
+            } finally {
+                // Hide progress bar regardless of success or failure
+                progressCard.style.display = 'none';
             }
         });
     </script>

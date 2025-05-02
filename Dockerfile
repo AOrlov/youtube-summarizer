@@ -1,11 +1,11 @@
-FROM python:3.11-slim
+FROM python:3.13.3-slim
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update && apk add --no-cache \
+    build-base \
+    && rm -rf /var/cache/apk/*
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
