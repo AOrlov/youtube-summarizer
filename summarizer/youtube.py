@@ -163,7 +163,7 @@ class YouTubeTranscriptExtractor:
 
             if response["items"]:
                 video = response["items"][0]
-                return video["snippet"].get("defaultAudioLanguage")
+                return video["snippet"].get("defaultAudioLanguage") or video["snippet"].get("defaultLanguage")
 
             return None
         except Exception as e:
