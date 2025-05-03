@@ -44,9 +44,11 @@ export GEMINI_API_KEY="your-api-key-here"
 The application can be run as a web service using Docker:
 
 1. Build and run the Docker container:
-```bash
-docker-compose up --build
-```
+# 1. Create a `.env` file in the project root (or use an existing one) and add your Gemini API key:
+GEMINI_API_KEY=your-api-key-here
+
+# 2. Start the application with Docker Compose:
+docker-compose --env-file .env up --build
 
 2. Access the web interface at http://localhost:5000
 

@@ -4,10 +4,10 @@ services:
   web:
     build: .
     ports:
-      - "5000:5000"
+      - "${PORT:-8081}:8080"
     volumes:
-      - ./output:/app/output
-      - ./cache:/app/cache
-    environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ./output:/app/output:rw
+      - ./cache:/app/cache:rw
     restart: unless-stopped
+    env_file:
+      - stack.env
