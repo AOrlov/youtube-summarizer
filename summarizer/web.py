@@ -27,14 +27,13 @@ def summarize():
     try:
         data = request.get_json()
         video_url = data.get("video_url")
-        max_tokens = data.get("max_tokens")
 
         if not video_url:
             return jsonify({"error": "Video URL is required"}), 400
 
         summary = summarizer.summarize_video(
             video_url=video_url,
-            max_tokens=max_tokens,
+            max_tokens=config.max_tokens,
         )
 
         return jsonify({"summary": summary, "status": "success"})
