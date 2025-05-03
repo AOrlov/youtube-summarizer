@@ -5,9 +5,6 @@ services:
     build: .
     ports:
       - "${PORT:-8081}:8080"
-    volumes:
-      - ./output:/app/output:rw
-      - ./cache:/app/cache:rw
     restart: unless-stopped
     env_file:
       - stack.env
