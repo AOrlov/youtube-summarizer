@@ -1,11 +1,14 @@
+import json
 import os
 import re
-import json
-from typing import Optional, List, Dict
-from urllib.parse import urlparse, parse_qs
-from youtube_transcript_api._api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+from typing import List, Optional
+from urllib.parse import parse_qs, urlparse
+
 from googleapiclient.discovery import build
+from youtube_transcript_api._api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import (NoTranscriptFound,
+                                            TranscriptsDisabled)
+
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +19,8 @@ class YouTubeURLValidator:
 
     # Regular expressions for different YouTube URL formats
     URL_PATTERNS = [
-        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([^&]+)",  # Standard URL
+        # Standard URL
+        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([^&]+)",
         r"(?:https?://)?(?:www\.)?youtube\.com/embed/([^/?]+)",  # Embed URL
         r"(?:https?://)?(?:www\.)?youtu\.be/([^/?]+)",  # Short URL
         r"(?:https?://)?(?:www\.)?youtube\.com/v/([^/?]+)",  # Old format
@@ -116,7 +120,8 @@ class YouTubeTranscriptExtractor:
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    logger.info(f"Loaded transcript from cache for video {video_id}")
+                    logger.info(
+                        f"Loaded transcript from cache for video {video_id}")
                     return data["transcript"]
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Error reading cache for {video_id}: {str(e)}")
@@ -153,7 +158,8 @@ class YouTubeTranscriptExtractor:
             The language code if available, None otherwise
         """
         if not self.api_key:
-            logger.warning("YouTube API key not provided, cannot detect video language")
+            logger.warning(
+                "YouTube API key not provided, cannot detect video language")
             return None
 
         try:
@@ -170,12 +176,13 @@ class YouTubeTranscriptExtractor:
             logger.warning(f"Error getting video language: {str(e)}")
             return None
 
-    def get_transcript(self, video_id: str, language: str) -> str:
+    def get_transcript(self, video_id: str, language: Optional[str]) -> tuple[str, str, str]:
         """
         Get the transcript for a YouTube video.
 
         Args:
             video_id: The YouTube video ID
+            language: The language code for the transcript. If None, the default language will be used.
 
         Returns:
             A tuple containing the transcript text and the video language
@@ -186,14 +193,19 @@ class YouTubeTranscriptExtractor:
             Exception: For other errors
         """
         try:
-            # Try to load from cache first
-            cached_transcript = self._load_from_cache(video_id, language)
-            if cached_transcript:
-                return cached_transcript
+            # Try to load from cache first if language is not None
+            if language is not None:
+                cached_transcript = self._load_from_cache(video_id, language)
+                if cached_transcript:
+                    return (video_id, language, cached_transcript)
 
             # If not in cache, fetch from YouTube
             transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-            transcript = transcript_list.find_transcript([language])
+            transcript = transcript_list.find_transcript(
+                [language]) if language else transcript_list.find_transcript(["ru", "en"])
+
+            language = language if language else transcript.language_code
+            logger.info(f"Using transcript language: {language}")
 
             # Format the transcript as plain text
             transcript_data = transcript.fetch()
@@ -204,10 +216,11 @@ class YouTubeTranscriptExtractor:
             # Save to cache
             self._save_to_cache(video_id, language, formatted_transcript)
 
-            return formatted_transcript
+            return (video_id, language, formatted_transcript)
 
         except TranscriptsDisabled:
-            raise TranscriptsDisabled(f"Transcripts are disabled for video: {video_id}")
+            raise TranscriptsDisabled(
+                f"Transcripts are disabled for video: {video_id}")
         except NoTranscriptFound:
             raise NoTranscriptFound(
                 video_id=video_id,

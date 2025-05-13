@@ -1,0 +1,61 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Web UI (Dev)",
+            "type": "python",
+            "request": "launch",
+            "module": "summarizer.web",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "ENV_FILE": "${workspaceFolder}/config/dev.env",
+                "FLASK_ENV": "development",
+                "FLASK_DEBUG": "1"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "Summarize Video (Dev)",
+            "type": "python",
+            "request": "launch",
+            "module": "summarizer.cli",
+            "args": [
+                "https://www.youtube.com/watch?v=hAOX5M9mdHQ"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "ENV_FILE": "${workspaceFolder}/config/dev.env"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "List Models (Dev)",
+            "type": "python",
+            "request": "launch",
+            "module": "summarizer.cli",
+            "args": [
+                "--list-models"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "ENV_FILE": "${workspaceFolder}/config/dev.env"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "Cleanup Summaries (Dev)",
+            "type": "python",
+            "request": "launch",
+            "module": "summarizer.cli",
+            "args": [
+                "--cleanup",
+                "7"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "ENV_FILE": "${workspaceFolder}/config/dev.env"
+            },
+            "justMyCode": true
+        }
+    ]
+}

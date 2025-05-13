@@ -1,6 +1,6 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
+
 from .app import YouTubeSummarizer
-import os
 from .cli import load_environment
 from .config import Config
 
@@ -16,6 +16,7 @@ summarizer = YouTubeSummarizer(
     youtube_api_key=config.youtube_api_key,
     output_dir=config.output_dir,
 )
+
 
 @app.route("/")
 def index():

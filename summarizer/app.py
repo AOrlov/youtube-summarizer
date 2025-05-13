@@ -1,11 +1,10 @@
 import os
-import json
-import logging
-from typing import Optional, Dict, Any
-from .youtube import YouTubeURLValidator, YouTubeTranscriptExtractor
-from .gemini import GeminiSummarizer
+from typing import Any, Dict, Optional
+
 from .file_handler import FileHandler
+from .gemini import GeminiSummarizer
 from .utils import get_logger
+from .youtube import YouTubeTranscriptExtractor, YouTubeURLValidator
 
 logger = get_logger(__name__)
 
@@ -30,7 +29,8 @@ class YouTubeSummarizer:
             model_name: The name of the Gemini model to use
         """
         self.url_validator = YouTubeURLValidator()
-        self.transcript_extractor = YouTubeTranscriptExtractor(api_key=youtube_api_key)
+        self.transcript_extractor = YouTubeTranscriptExtractor(
+            api_key=youtube_api_key)
         self.summarizer = GeminiSummarizer(gemini_api_key, model_name)
         self.file_handler = FileHandler(output_dir)
 
@@ -79,10 +79,8 @@ class YouTubeSummarizer:
                 raise ValueError("Invalid YouTube URL")
 
             video_lang = self.transcript_extractor.get_video_language(video_id)
-            if video_lang is None:
-                raise ValueError("Could not determine video language")
-            # Check for existing summary
-            if save_to_file:
+
+            def get_cached_summary_if_available(video_id: str, video_lang: str) -> Optional[str]:
                 existing_summary = self.file_handler.get_summary_path(
                     video_id, video_lang
                 )
@@ -91,19 +89,27 @@ class YouTubeSummarizer:
                     with open(existing_summary, "r") as f:
                         return f.read()
 
+            # Check for existing summary if video language is available
+            if video_lang:
+                cached = get_cached_summary_if_available(video_id, video_lang)
+                if cached:
+                    return cached
+
             # Extract transcript
-            transcript = self.transcript_extractor.get_transcript(
+            video_id, video_lang, transcript = self.transcript_extractor.get_transcript(
                 video_id, video_lang
             )
             logger.info(f"Extracted transcript for video {video_id}")
 
             # Generate summary
-            summary = self.summarizer.summarize(transcript, video_lang, max_tokens)
+            summary = self.summarizer.summarize(
+                transcript, video_lang, max_tokens)
             logger.info(f"Generated summary for video {video_id}")
 
             # Save summary if requested
             if save_to_file:
-                self.file_handler.save_summary(video_id, video_lang, summary, metadata)
+                self.file_handler.save_summary(
+                    video_id, video_lang, summary, metadata)
                 logger.info(f"Saved summary for video {video_id}")
 
             return summary
