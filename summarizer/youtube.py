@@ -208,7 +208,19 @@ class YouTubeTranscriptExtractor:
             logger.info(f"Using transcript language: {language}")
 
             # Format the transcript as plain text
-            transcript_data = transcript.fetch()
+            retry_times = 5
+            for i in range(retry_times):
+                try:
+                    transcript_data = transcript.fetch()
+                    break
+                except Exception as retry_e:
+                    if i == retry_times - 1:
+                        logger.error(
+                            f"Failed to fetch transcript after {retry_times} attempts: {str(retry_e)}")
+                        raise retry_e
+                    logger.warning(
+                        f"Retrying transcript fetch due to error: {str(retry_e)}")
+
             formatted_transcript = "\n".join(
                 f"{item['text']}" for item in transcript_data
             )
