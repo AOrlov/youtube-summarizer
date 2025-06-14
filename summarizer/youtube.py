@@ -222,7 +222,7 @@ class YouTubeTranscriptExtractor:
                         f"Retrying transcript fetch due to error: {str(retry_e)}")
 
             formatted_transcript = "\n".join(
-                f"{item['text']}" for item in transcript_data
+                f"{item.text}" for item in transcript_data.snippets
             )
 
             # Save to cache
