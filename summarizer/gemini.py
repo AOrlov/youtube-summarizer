@@ -1,7 +1,10 @@
-import os
 import logging
-from typing import Optional, List
+import os
+import time
+from typing import List, Optional
+
 import google.generativeai as genai
+
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -80,7 +83,8 @@ Summary:"""
             # Generate the summary
             model = genai.GenerativeModel(self.model_name)
             response = model.generate_content(
-                prompt, generation_config=generation_config
+                prompt, generation_config=generation_config, request_options={
+                    "timeout": 600},
             )
 
             logger.info("Summary generated successfully")
