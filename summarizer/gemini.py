@@ -1,6 +1,7 @@
 from typing import List, Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from .utils import get_logger
 
@@ -19,16 +20,21 @@ class GeminiSummarizer:
             model_name: The name of the Gemini model to use (default: "gemini-1.5-flash-latest")
         """
         self.api_key = api_key
-        self.model_name = model_name
-        self._configure_api()
+        self.model_name = (
+            model_name
+            if model_name.startswith("models/")
+            else f"models/{model_name}"
+        )
+        self.client = self._configure_api()
 
         logger.info(f"Initialized GeminiSummarizer with model: {model_name}")
 
-    def _configure_api(self) -> None:
+    def _configure_api(self) -> genai.Client:
         """Configure the Gemini API with the provided key."""
         try:
-            genai.configure(api_key=self.api_key)
+            client = genai.Client(api_key=self.api_key)
             logger.info("Gemini API configured successfully")
+            return client
         except Exception as e:
             logger.error(f"Failed to configure Gemini API: {str(e)}")
             raise
@@ -70,21 +76,27 @@ Summary:"""
         try:
             prompt = self._create_prompt(transcript, language)
             # Configure generation parameters
-            generation_config = genai.types.GenerationConfig(
+            generation_config = types.GenerateContentConfig(
                 temperature=0.7,
                 top_p=0.8,
                 top_k=40,
                 max_output_tokens=max_tokens,
+                http_options=types.HttpOptions(timeout=60000),
             )
 
             # Generate the summary
-            model = genai.GenerativeModel(self.model_name)
-            response = model.generate_content(
-                prompt, generation_config=generation_config, request_options={
-                    "timeout": 600},
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=generation_config,
             )
 
             logger.info("Summary generated successfully")
+            if not getattr(response, "text", ""):
+                error_message = "Gemini API returned an empty response"
+                logger.error(error_message)
+                raise ValueError(error_message)
+
             return response.text
 
         except Exception as e:
@@ -99,7 +111,7 @@ Summary:"""
             List of available model names
         """
         try:
-            models = genai.list_models()
+            models = self.client.models.list()
             return [model.name for model in models]
         except Exception as e:
             logger.error(f"Error getting available models: {str(e)}")
