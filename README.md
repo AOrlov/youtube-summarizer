@@ -50,7 +50,9 @@ GEMINI_API_KEY=your-api-key-here
 # 2. Start the application with Docker Compose:
 docker-compose --env-file .env up --build
 
-2. Access the web interface at http://localhost:5000
+2. Access the web interface at http://localhost:5100. You can also open the page with a
+   `video_url` query parameter (for example http://localhost:5100/?video_url=https://www.youtube.com/watch?v=demo)
+   and the form will auto-fill and trigger summarization immediately.
 
 The web interface provides a simple form where you can:
 - Enter a YouTube video URL
@@ -75,6 +77,13 @@ Example with options:
 ```bash
 python -m summarizer.cli "https://www.youtube.com/watch?v=example" --language es --max-tokens 500
 ```
+
+### Firefox Extension
+
+- The Firefox WebExtension lives in `extensions/firefox`.
+- Load it temporarily via `about:debugging#/runtime/this-firefox` → `Load Temporary Add-on...` → select `extensions/firefox/manifest.json`.
+- Click the toolbar button while viewing a YouTube video to open the Summarizer UI in a new tab with the video URL pre-populated and automatically summarizing.
+- The extension defaults to `http://localhost:5100/` as the Summarizer base. Adjust it from the extension's Options page if you host the app elsewhere.
 
 ### Python API
 

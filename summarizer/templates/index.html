@@ -65,13 +65,16 @@
     </div>
 
     <script>
-        document.getElementById('summarizeForm').addEventListener('submit', async (e) => {
+        const summarizeForm = document.getElementById('summarizeForm');
+        const videoUrlInput = document.getElementById('videoUrl');
+        const summaryCard = document.getElementById('summaryCard');
+        const progressCard = document.getElementById('progressCard');
+        const summaryElement = document.getElementById('summary');
+
+        summarizeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const videoUrl = document.getElementById('videoUrl').value;
-            const summaryCard = document.getElementById('summaryCard');
-            const progressCard = document.getElementById('progressCard');
-            const summaryElement = document.getElementById('summary');
+            const videoUrl = videoUrlInput.value;
 
             // Show progress bar and hide summary card
             progressCard.style.display = 'block';
@@ -104,6 +107,26 @@
                 progressCard.style.display = 'none';
             }
         });
+
+        const initializeFromQuery = () => {
+            const params = new URLSearchParams(window.location.search);
+            const prefilledUrl = params.get('video_url') || params.get('video');
+
+            if (!prefilledUrl) {
+                return;
+            }
+
+            try {
+                videoUrlInput.value = decodeURIComponent(prefilledUrl);
+            } catch (error) {
+                videoUrlInput.value = prefilledUrl;
+            }
+
+            // Trigger summarization automatically when coming from the extension
+            summarizeForm.dispatchEvent(new Event('submit', { cancelable: true }));
+        };
+
+        initializeFromQuery();
     </script>
 </body>
 

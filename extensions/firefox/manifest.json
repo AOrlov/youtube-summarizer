@@ -1,0 +1,30 @@
+{
+  "manifest_version": 2,
+  "name": "Summarizer for YouTube",
+  "version": "1.0.0",
+  "description": "Open the Summarizer web UI prefilled with the current YouTube video.",
+  "browser_action": {
+    "default_title": "Summarize this video",
+    "default_icon": "icon.png"
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ],
+    "persistent": false
+  },
+  "icons": {
+    "48": "icon.png",
+    "96": "icon.png",
+    "128": "icon.png"
+  },
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "browser_style": true,
+    "open_in_tab": true
+  }
+}
