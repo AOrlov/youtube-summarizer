@@ -81,9 +81,9 @@ Summary:"""
                 top_p=0.8,
                 top_k=40,
                 max_output_tokens=max_tokens,
-                http_options=types.HttpOptions(timeout=60000),
+                http_options=types.HttpOptions(timeout=120000),
             )
-
+            logger.info("Sending request to Gemini API for summary generation")
             # Generate the summary
             response = self.client.models.generate_content(
                 model=self.model_name,
