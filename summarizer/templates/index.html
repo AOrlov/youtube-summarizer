@@ -139,6 +139,44 @@
             copyTranscriptBtn.textContent = 'Copy transcript';
         };
 
+        const canUseAsyncClipboard = () =>
+            Boolean(window.isSecureContext && navigator.clipboard?.writeText);
+
+        const legacyCopy = (text) => {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.setAttribute('readonly', '');
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                document.body.appendChild(textarea);
+                textarea.select();
+                const success = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                return success;
+            } catch (error) {
+                console.error('Fallback clipboard copy failed.', error);
+                return false;
+            }
+        };
+
+        const copyTextToClipboard = async (text) => {
+            if (!text) {
+                return false;
+            }
+
+            if (canUseAsyncClipboard()) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (error) {
+                    console.warn('Clipboard API failed, falling back to execCommand copy.', error);
+                }
+            }
+
+            return legacyCopy(text);
+        };
+
         const renderResult = (data) => {
             const hasSummary = Boolean(data.summary);
             const hasTranscript = Boolean(data.transcript);
@@ -204,20 +242,13 @@
 
         copyTranscriptBtn.addEventListener('click', async () => {
             const transcriptText = transcriptElement.textContent;
-            if (!transcriptText) {
-                return;
-            }
 
-            try {
-                await navigator.clipboard.writeText(transcriptText);
-                copyTranscriptBtn.textContent = 'Copied!';
-            } catch (error) {
-                copyTranscriptBtn.textContent = 'Copy failed';
-            } finally {
-                setTimeout(() => {
-                    copyTranscriptBtn.textContent = 'Copy transcript';
-                }, 1500);
-            }
+            const copied = await copyTextToClipboard(transcriptText);
+            copyTranscriptBtn.textContent = copied ? 'Copied!' : 'Copy failed';
+
+            setTimeout(() => {
+                copyTranscriptBtn.textContent = 'Copy transcript';
+            }, 1500);
         });
 
         const initializeFromQuery = () => {
