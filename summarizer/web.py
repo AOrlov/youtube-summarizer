@@ -32,15 +32,29 @@ def summarize():
         if not video_url:
             return jsonify({"error": "Video URL is required"}), 400
 
-        summary = summarizer.summarize_video(
+        result = summarizer.summarize_video(
             video_url=video_url,
             max_tokens=config.max_tokens,
+            include_transcript=True,
+            allow_summary_failure=True,
         )
 
-        return jsonify({"summary": summary, "status": "success"})
+        status = "success" if result.get("summary") else "partial_success"
+
+        response_payload = {
+            "summary": result.get("summary"),
+            "transcript": result.get("transcript"),
+            "language": result.get("language"),
+            "video_id": result.get("video_id"),
+            "summary_error": result.get("summary_error"),
+            "status": status,
+        }
+
+        return jsonify(response_payload)
 
     except Exception as e:
-        return jsonify({"error": str(e), "status": "error"}), 500
+        status_code = 400 if isinstance(e, ValueError) else 500
+        return jsonify({"error": str(e), "status": "error"}), status_code
 
 
 if __name__ == "__main__":

@@ -24,6 +24,25 @@
             padding: 0.2rem 0.4rem;
             border-radius: 0.25rem;
         }
+
+        .transcript-container {
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+            padding: 1rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 450px;
+            overflow-y: auto;
+            font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .results-card {
+            transition: box-shadow 0.2s ease;
+        }
+
+        .results-card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
 
@@ -32,22 +51,51 @@
         <h1 class="text-center mb-4">YouTube Video Summarizer</h1>
 
         <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
+            <div class="col-md-10 col-lg-8">
+                <div class="card shadow-sm">
                     <div class="card-body">
                         <form id="summarizeForm">
                             <div class="mb-3">
                                 <label for="videoUrl" class="form-label">YouTube Video URL</label>
                                 <input type="url" class="form-control" id="videoUrl" required>
                             </div>
-                            <button type="submit" class="btn btn-primary">Summarize</button>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <button type="submit" class="btn btn-primary">Summarize</button>
+                                <small class="text-muted">You will always get the full transcript for copying.</small>
+                            </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="card mt-4" id="summaryCard" style="display: none;">
+                <div class="alert alert-danger mt-4 d-none" id="errorAlert"></div>
+
+                <div class="card mt-4 results-card shadow-sm d-none" id="resultCard">
                     <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <div>
+                                <h5 class="mb-1">Summary</h5>
+                                <p class="text-muted small mb-0">Generated with Gemini when available.</p>
+                            </div>
+                            <span class="badge bg-secondary d-none" id="languageBadge"></span>
+                        </div>
+
+                        <div class="alert alert-warning d-none" id="summaryNotice"></div>
+
                         <div class="summary-container" id="summary"></div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                            <div>
+                                <h5 class="mb-1">Transcript</h5>
+                                <p class="text-muted small mb-0">Copy/paste here if the summary API is rate-limited.</p>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="copyTranscriptBtn">
+                                Copy transcript
+                            </button>
+                        </div>
+
+                        <div class="transcript-container" id="transcript"></div>
                     </div>
                 </div>
 
@@ -57,7 +105,7 @@
                             <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
                                 style="width: 100%"></div>
                         </div>
-                        <p class="text-center mt-2">Processing video summary...</p>
+                        <p class="text-center mt-2 mb-0">Fetching transcript and summary...</p>
                     </div>
                 </div>
             </div>
@@ -67,18 +115,66 @@
     <script>
         const summarizeForm = document.getElementById('summarizeForm');
         const videoUrlInput = document.getElementById('videoUrl');
-        const summaryCard = document.getElementById('summaryCard');
+        const resultCard = document.getElementById('resultCard');
         const progressCard = document.getElementById('progressCard');
         const summaryElement = document.getElementById('summary');
+        const transcriptElement = document.getElementById('transcript');
+        const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
+        const languageBadge = document.getElementById('languageBadge');
+        const summaryNotice = document.getElementById('summaryNotice');
+        const errorAlert = document.getElementById('errorAlert');
+
+        const setLoading = (isLoading) => {
+            progressCard.style.display = isLoading ? 'block' : 'none';
+        };
+
+        const resetUI = () => {
+            errorAlert.classList.add('d-none');
+            resultCard.classList.add('d-none');
+            summaryNotice.classList.add('d-none');
+            languageBadge.classList.add('d-none');
+            summaryElement.innerHTML = '';
+            transcriptElement.textContent = '';
+            copyTranscriptBtn.disabled = true;
+            copyTranscriptBtn.textContent = 'Copy transcript';
+        };
+
+        const renderResult = (data) => {
+            const hasSummary = Boolean(data.summary);
+            const hasTranscript = Boolean(data.transcript);
+
+            if (hasSummary) {
+                summaryElement.innerHTML = marked.parse(data.summary);
+            } else {
+                summaryElement.innerHTML = '<p class="text-muted mb-0">Summary is unavailable. Use the transcript below.</p>';
+            }
+
+            if (data.summary_error) {
+                summaryNotice.textContent = `Summary unavailable: ${data.summary_error}`;
+                summaryNotice.classList.remove('d-none');
+            }
+
+            transcriptElement.textContent = hasTranscript ? data.transcript : 'Transcript unavailable.';
+            copyTranscriptBtn.disabled = !hasTranscript;
+
+            if (data.language) {
+                languageBadge.textContent = `Language: ${data.language}`;
+                languageBadge.classList.remove('d-none');
+            }
+
+            resultCard.classList.remove('d-none');
+        };
 
         summarizeForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const videoUrl = videoUrlInput.value.trim();
 
-            const videoUrl = videoUrlInput.value;
+            if (!videoUrl) {
+                return;
+            }
 
-            // Show progress bar and hide summary card
-            progressCard.style.display = 'block';
-            summaryCard.style.display = 'none';
+            resetUI();
+            setLoading(true);
 
             try {
                 const response = await fetch('/api/summarize', {
@@ -93,18 +189,34 @@
 
                 const data = await response.json();
 
-                if (data.status === 'success') {
-                    summaryElement.innerHTML = marked.parse(data.summary);
-                    summaryCard.style.display = 'block';
-                } else {
-                    alert('Error: ' + data.error);
+                if (!response.ok || data.status === 'error') {
+                    throw new Error(data.error || `Request failed with status ${response.status}`);
                 }
+
+                renderResult(data);
             } catch (error) {
-                alert('An error occurred while processing your request.');
-                console.error('Error:', error);
+                errorAlert.textContent = error.message || 'An error occurred while processing your request.';
+                errorAlert.classList.remove('d-none');
             } finally {
-                // Hide progress bar regardless of success or failure
-                progressCard.style.display = 'none';
+                setLoading(false);
+            }
+        });
+
+        copyTranscriptBtn.addEventListener('click', async () => {
+            const transcriptText = transcriptElement.textContent;
+            if (!transcriptText) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(transcriptText);
+                copyTranscriptBtn.textContent = 'Copied!';
+            } catch (error) {
+                copyTranscriptBtn.textContent = 'Copy failed';
+            } finally {
+                setTimeout(() => {
+                    copyTranscriptBtn.textContent = 'Copy transcript';
+                }, 1500);
             }
         });
 

@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 from .file_handler import FileHandler
 from .gemini import GeminiSummarizer
@@ -50,7 +50,9 @@ class YouTubeSummarizer:
         max_tokens: Optional[int] = None,
         save_to_file: bool = True,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> str:
+        include_transcript: bool = False,
+        allow_summary_failure: bool = False,
+    ) -> Union[str, Dict[str, Any]]:
         """
         Extract transcript and generate summary for a YouTube video.
 
@@ -59,9 +61,11 @@ class YouTubeSummarizer:
             max_tokens: Optional maximum number of tokens for the summary
             save_to_file: Whether to save the summary to a file
             metadata: Optional metadata to save with the summary
+            include_transcript: Whether to return the transcript along with the summary
+            allow_summary_failure: If True, return transcript even when summary generation fails
 
         Returns:
-            The generated summary
+            The generated summary or a dictionary containing both summary and transcript when requested
 
         Raises:
             ValueError: If the video URL is invalid
@@ -78,39 +82,55 @@ class YouTubeSummarizer:
             if not video_id:
                 raise ValueError("Invalid YouTube URL")
 
-            video_lang = self.transcript_extractor.get_video_language(video_id)
-
-            def get_cached_summary_if_available(video_id: str, video_lang: str) -> Optional[str]:
-                existing_summary = self.file_handler.get_summary_path(
-                    video_id, video_lang
-                )
-                if existing_summary and os.path.exists(existing_summary):
-                    logger.info(f"Found existing summary for video {video_id}")
-                    with open(existing_summary, "r") as f:
-                        return f.read()
-
-            # Check for existing summary if video language is available
-            if video_lang:
-                cached = get_cached_summary_if_available(video_id, video_lang)
-                if cached:
-                    return cached
+            language_hint = self.transcript_extractor.get_video_language(video_id)
 
             # Extract transcript
             video_id, video_lang, transcript = self.transcript_extractor.get_transcript(
-                video_id, video_lang
+                video_id, language_hint
             )
             logger.info(f"Extracted transcript for video {video_id}")
 
-            # Generate summary
-            summary = self.summarizer.summarize(
-                transcript, video_lang, max_tokens)
-            logger.info(f"Generated summary for video {video_id}")
+            # Try loading summary from cache using the actual transcript language
+            summary_path = self.file_handler.get_summary_path(video_id, video_lang)
+            summary = None
+            summary_error = None
 
-            # Save summary if requested
-            if save_to_file:
+            if summary_path and os.path.exists(summary_path):
+                logger.info(f"Found existing summary for video {video_id}")
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    summary = f.read()
+
+            # Generate summary if not cached
+            if summary is None:
+                try:
+                    summary = self.summarizer.summarize(
+                        transcript, video_lang, max_tokens
+                    )
+                    logger.info(f"Generated summary for video {video_id}")
+                except Exception as e:
+                    summary_error = str(e)
+                    logger.error(f"Error during summarization: {summary_error}")
+                    if not (include_transcript and allow_summary_failure):
+                        raise
+
+            # Save summary if requested and newly generated
+            if save_to_file and summary and not summary_path:
                 self.file_handler.save_summary(
-                    video_id, video_lang, summary, metadata)
+                    video_id, video_lang, summary, metadata
+                )
                 logger.info(f"Saved summary for video {video_id}")
+
+            if include_transcript:
+                return {
+                    "video_id": video_id,
+                    "language": video_lang,
+                    "transcript": transcript,
+                    "summary": summary,
+                    "summary_error": summary_error,
+                }
+
+            if summary is None:
+                raise ValueError("Summary could not be generated.")
 
             return summary
 
