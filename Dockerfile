@@ -1,11 +1,14 @@
+# syntax=docker/dockerfile:1.6
 FROM python:3.13-slim
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/lib/apt/lists \
+    --mount=type=cache,target=/var/cache/apt \
+    apt-get update && apt-get install -y \
+        build-essential \
+        && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && \
@@ -13,7 +16,8 @@ RUN useradd -m -u 1000 appuser && \
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt gunicorn
 
 # Copy the rest of the application
 COPY --chown=appuser:appuser . .
