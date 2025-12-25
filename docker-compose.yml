@@ -10,11 +10,12 @@ services:
       - stack.env
 
   promtail:
-    image: grafana/promtail:2.9.3
+    build:
+      context: .
+      dockerfile: Dockerfile.promtail
     command: -config.file=/etc/promtail/config.yml -config.expand-env=true
-    environment:
-      LOKI_URL: "http://host.docker.internal:3100/loki/api/v1/push"
+    env_file:
+      - stack.env
     volumes:
-      - ./promtail-config.yaml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
