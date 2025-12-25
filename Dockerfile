@@ -1,4 +1,13 @@
 # syntax=docker/dockerfile:1.6
+FROM python:3.13-slim AS wheels
+
+WORKDIR /wheels
+
+COPY requirements.txt .
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip wheel --prefer-binary -r requirements.txt gunicorn
+
 FROM python:3.13-slim
 
 WORKDIR /app
@@ -8,10 +17,11 @@ RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 
 # Copy requirements first to leverage Docker cache
+COPY --from=wheels /wheels /wheels
 COPY requirements.txt .
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefer-binary -r requirements.txt gunicorn
+RUN pip install --no-index --find-links=/wheels -r requirements.txt gunicorn \
+    && rm -rf /wheels
 
 # Copy the rest of the application
 COPY --chown=appuser:appuser . .
