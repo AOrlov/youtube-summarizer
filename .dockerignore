@@ -1,13 +1,18 @@
-# Prevent huge build contexts and runtime-only caches
-.git
-.vscode
-.DS_Store
 __pycache__/
 *.pyc
-venv/
-.venv/
-pytest_cache/
+*.pyo
+*.pyd
+*.log
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+.git/
+.gitignore
+tests/
 cache/
 output/
-tests/
+extensions/

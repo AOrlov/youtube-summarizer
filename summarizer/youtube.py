@@ -4,10 +4,11 @@ import re
 from typing import List, Optional
 from urllib.parse import parse_qs, urlparse
 
-from googleapiclient.discovery import build
 from youtube_transcript_api._api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import (NoTranscriptFound,
-                                            TranscriptsDisabled)
+from youtube_transcript_api._errors import (
+    NoTranscriptFound,
+    TranscriptsDisabled,
+)
 
 from .utils import get_logger
 
@@ -147,42 +148,13 @@ class YouTubeTranscriptExtractor:
         except Exception as e:
             logger.warning(f"Error saving cache for {video_id}: {str(e)}")
 
-    def get_video_language(self, video_id: str) -> Optional[str]:
-        """
-        Get the default audio language of a YouTube video using the YouTube Data API.
-
-        Args:
-            video_id: The YouTube video ID
-
-        Returns:
-            The language code if available, None otherwise
-        """
-        if not self.api_key:
-            logger.warning(
-                "YouTube API key not provided, cannot detect video language")
-            return None
-
-        try:
-            youtube = build("youtube", "v3", developerKey=self.api_key)
-            request = youtube.videos().list(part="snippet", id=video_id)
-            response = request.execute()
-
-            if response["items"]:
-                video = response["items"][0]
-                return video["snippet"].get("defaultAudioLanguage") or video["snippet"].get("defaultLanguage")
-
-            return None
-        except Exception as e:
-            logger.warning(f"Error getting video language: {str(e)}")
-            return None
-
-    def get_transcript(self, video_id: str, language: Optional[str]) -> tuple[str, str, str]:
+    def get_transcript(self, video_id: str) -> tuple[str, str, str]:
         """
         Get the transcript for a YouTube video.
+        Prefer Russian, then English, then fall back to any available transcript.
 
         Args:
             video_id: The YouTube video ID
-            language: The language code for the transcript. If None, the default language will be used.
 
         Returns:
             A tuple containing the transcript text and the video language
@@ -193,39 +165,79 @@ class YouTubeTranscriptExtractor:
             Exception: For other errors
         """
         try:
-            # Try to load from cache first if language is not None
-            if language is not None:
-                cached_transcript = self._load_from_cache(video_id, language)
+            preferred_languages = ["ru", "en"]
+
+            # Try to load from cache first using preferred languages
+            for preferred_language in preferred_languages:
+                cached_transcript = self._load_from_cache(
+                    video_id, preferred_language
+                )
                 if cached_transcript:
-                    return (video_id, language, cached_transcript)
+                    return (video_id, preferred_language, cached_transcript)
 
             # Format the transcript as plain text
             retry_times = 5
             for i in range(retry_times):
                 try:
-                    transcript_data = YouTubeTranscriptApi().fetch(
-                        video_id, ["ru", "en"])
-                    language = transcript_data.language_code
+                    transcript_list = YouTubeTranscriptApi().list(video_id)
+                    transcript = transcript_list.find_transcript(
+                        preferred_languages
+                    )
+                    transcript_data = transcript.fetch()
+                    language = transcript.language_code
                     logger.info(
-                        f"Using transcript language: {language} for video {video_id}")
+                        "Using transcript language: %s for video %s",
+                        language,
+                        video_id,
+                    )
                     break
+                except NoTranscriptFound:
+                    try:
+                        transcript_list = YouTubeTranscriptApi().list(video_id)
+                        transcript = next(iter(transcript_list), None)
+                        if transcript is None:
+                            raise
+                        transcript_data = transcript.fetch()
+                        language = transcript.language_code
+                        logger.info(
+                            "Falling back to transcript language: %s for video %s",
+                            language,
+                            video_id,
+                        )
+                        break
+                    except Exception as retry_e:
+                        if i == retry_times - 1:
+                            logger.error(
+                                "Failed to fetch transcript after %s attempts: %s",
+                                retry_times,
+                                str(retry_e),
+                            )
+                            raise retry_e
+                        logger.warning(
+                            "Retrying transcript fetch due to error: %s",
+                            str(retry_e),
+                        )
                 except Exception as retry_e:
                     if i == retry_times - 1:
                         logger.error(
-                            f"Failed to fetch transcript after {retry_times} attempts: {str(retry_e)}")
+                            "Failed to fetch transcript after %s attempts: %s",
+                            retry_times,
+                            str(retry_e),
+                        )
                         raise retry_e
                     logger.warning(
-                        f"Retrying transcript fetch due to error: {str(retry_e)}")
+                        "Retrying transcript fetch due to error: %s",
+                        str(retry_e),
+                    )
 
             formatted_transcript = "\n".join(
                 f"{item.text}" for item in transcript_data.snippets
             )
 
             # Save to cache
-            self._save_to_cache(
-                video_id, transcript_data.language_code, formatted_transcript)
+            self._save_to_cache(video_id, language, formatted_transcript)
 
-            return (video_id, transcript_data.language_code, formatted_transcript)
+            return (video_id, language, formatted_transcript)
 
         except TranscriptsDisabled:
             raise TranscriptsDisabled(
@@ -233,7 +245,7 @@ class YouTubeTranscriptExtractor:
         except NoTranscriptFound:
             raise NoTranscriptFound(
                 video_id=video_id,
-                requested_language_codes=[language],
+                requested_language_codes=preferred_languages,
                 transcript_data=[],
             )
         except Exception as e:

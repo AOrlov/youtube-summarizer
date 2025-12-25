@@ -1,8 +1,21 @@
+import logging
+import os
+
+from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 
 from .app import YouTubeSummarizer
-from .cli import load_environment
 from .config import Config
+
+
+def load_environment():
+    """Load environment variables from the specified file."""
+    env_file = os.getenv("ENV_FILE")
+    if env_file and os.path.exists(env_file):
+        load_dotenv(env_file)
+        logging.info("Loaded environment variables from %s", env_file)
+    else:
+        logging.warning("No environment file specified or file not found")
 
 app = Flask(__name__)
 

@@ -9,8 +9,9 @@ RUN useradd -m -u 1000 appuser && \
 
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt gunicorn
+    pip install --prefer-binary -r requirements.txt gunicorn
 
 # Copy the rest of the application
 COPY --chown=appuser:appuser . .

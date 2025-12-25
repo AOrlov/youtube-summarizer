@@ -8,7 +8,6 @@ A Python application that extracts transcripts from YouTube videos and generates
 - Generate summaries using Google's Gemini API
 - Support for multiple languages
 - Configurable summary length
-- Command-line interface
 - Comprehensive logging
 - Web interface
 - Docker support
@@ -62,25 +61,6 @@ The web interface provides a simple form where you can:
 - Enter a YouTube video URL
 - Optionally specify the maximum number of tokens for the summary
 - Submit to generate a summary
-
-### Command Line Interface
-
-The simplest way to use the summarizer is through the command-line interface:
-
-```bash
-python -m summarizer.cli "https://www.youtube.com/watch?v=example"
-```
-
-#### Options
-
-- `--language`, `-l`: Specify the language for summarization (default: "en")
-- `--max-tokens`, `-t`: Set maximum number of tokens for the summary
-- `--list-models`: List available Gemini models
-
-Example with options:
-```bash
-python -m summarizer.cli "https://www.youtube.com/watch?v=example" --language es --max-tokens 500
-```
 
 ### Firefox Extension
 

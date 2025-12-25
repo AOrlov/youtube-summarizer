@@ -1,5 +1,4 @@
 python-dotenv==1.0.1
-google-api-python-client==2.108.0
 requests==2.32.4
 google-genai==1.38.0
 youtube-transcript-api==1.2.3

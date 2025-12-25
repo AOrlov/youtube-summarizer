@@ -82,11 +82,9 @@ class YouTubeSummarizer:
             if not video_id:
                 raise ValueError("Invalid YouTube URL")
 
-            language_hint = self.transcript_extractor.get_video_language(video_id)
-
             # Extract transcript
             video_id, video_lang, transcript = self.transcript_extractor.get_transcript(
-                video_id, language_hint
+                video_id
             )
             logger.info(f"Extracted transcript for video {video_id}")
 
