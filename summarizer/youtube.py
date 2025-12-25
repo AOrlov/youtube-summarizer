@@ -199,19 +199,15 @@ class YouTubeTranscriptExtractor:
                 if cached_transcript:
                     return (video_id, language, cached_transcript)
 
-            # If not in cache, fetch from YouTube
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-            transcript = transcript_list.find_transcript(
-                [language]) if language else transcript_list.find_transcript(["ru", "en"])
-
-            language = language if language else transcript.language_code
-            logger.info(f"Using transcript language: {language}")
-
             # Format the transcript as plain text
             retry_times = 5
             for i in range(retry_times):
                 try:
-                    transcript_data = transcript.fetch()
+                    transcript_data = YouTubeTranscriptApi().fetch(
+                        video_id, ["ru", "en"])
+                    language = transcript_data.language_code
+                    logger.info(
+                        f"Using transcript language: {language} for video {video_id}")
                     break
                 except Exception as retry_e:
                     if i == retry_times - 1:
@@ -226,9 +222,10 @@ class YouTubeTranscriptExtractor:
             )
 
             # Save to cache
-            self._save_to_cache(video_id, language, formatted_transcript)
+            self._save_to_cache(
+                video_id, transcript_data.language_code, formatted_transcript)
 
-            return (video_id, language, formatted_transcript)
+            return (video_id, transcript_data.language_code, formatted_transcript)
 
         except TranscriptsDisabled:
             raise TranscriptsDisabled(
