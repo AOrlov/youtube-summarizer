@@ -3,13 +3,6 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install system dependencies
-RUN --mount=type=cache,target=/var/lib/apt/lists \
-    --mount=type=cache,target=/var/cache/apt \
-    apt-get update && apt-get install -y \
-        build-essential \
-        && rm -rf /var/lib/apt/lists/*
-
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
@@ -17,19 +10,19 @@ RUN useradd -m -u 1000 appuser && \
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt gunicorn
+    pip install --no-cache-dir -r requirements.txt gunicorn
 
 # Copy the rest of the application
 COPY --chown=appuser:appuser . .
 
 # Create necessary directories
-RUN mkdir -p output cache && \
-    chown -R appuser:appuser output cache
+RUN install -d -o appuser -g appuser /app/output /app/cache
 
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV FLASK_APP=summarizer.web
 ENV FLASK_ENV=production
+ENV WEB_CONCURRENCY=1
 
 # Switch to non-root user
 USER appuser
@@ -38,4 +31,4 @@ USER appuser
 EXPOSE 8080
 
 # Command to run the application with Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120", "summarizer.web:app"] 
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:8080 --workers ${WEB_CONCURRENCY:-1} --timeout 120 summarizer.web:app"]

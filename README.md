@@ -31,6 +31,10 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
+For development tools:
+```bash
+pip install -r requirements-dev.txt
+```
 
 4. Set up your Gemini API key:
 ```bash
@@ -118,10 +122,10 @@ The application uses Python's built-in logging module with the following configu
 ## Requirements
 
 - Python 3.8+
-- google-generativeai
+- google-genai
 - youtube-transcript-api
-- pytest (for development)
 - Flask (for web interface)
+- pytest/black/isort (for development)
 
 ## License
 
