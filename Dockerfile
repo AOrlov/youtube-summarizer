@@ -19,8 +19,9 @@ RUN useradd -m -u 1000 appuser && \
 # Copy requirements first to leverage Docker cache
 COPY --from=wheels /wheels /wheels
 COPY requirements.txt .
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN pip install --no-index --find-links=/wheels -r requirements.txt gunicorn \
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+RUN pip install --no-compile --no-index --find-links=/wheels -r requirements.txt gunicorn \
     && rm -rf /wheels
 
 # Copy the rest of the application
