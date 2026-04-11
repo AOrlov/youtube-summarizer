@@ -16,7 +16,7 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 - Complete each task fully before moving to the next
 - Preserve the existing `?video_url=` entrypoint so the Firefox extension and local/manual flows keep working
 - Keep the implementation simple: normalize mirrored `youtube.home` requests into canonical `youtube.com` video URLs instead of building a YouTube-like router
-- Use English as the initial dropdown default unless product requirements change later
+- Use Russian as the initial dropdown default in the web UI unless product requirements change later
 - CRITICAL: every task MUST include new or updated tests
 - CRITICAL: all tests must pass before starting the next task
 
