@@ -92,6 +92,25 @@ def test_transcript_extractor_returns_cached_transcript(tmp_path):
     )
 
 
+def test_transcript_extractor_reuses_non_preferred_cached_transcript(
+    monkeypatch, tmp_path
+):
+    class FakeTranscriptApi:
+        def list(self, video_id):
+            raise AssertionError("API should not be called when cache exists")
+
+    monkeypatch.setattr(youtube_module, "YouTubeTranscriptApi", FakeTranscriptApi)
+
+    extractor = YouTubeTranscriptExtractor(cache_dir=str(tmp_path))
+    extractor._save_to_cache("video123", "de", "zwischengespeicherter text")
+
+    assert extractor.get_transcript("video123") == (
+        "video123",
+        "de",
+        "zwischengespeicherter text",
+    )
+
+
 def test_transcript_extractor_fetches_formats_and_caches_transcript(
     monkeypatch, tmp_path
 ):

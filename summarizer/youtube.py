@@ -183,6 +183,24 @@ class YouTubeTranscriptExtractor:
         except Exception as e:
             logger.warning(f"Error saving cache for {video_id}: {str(e)}")
 
+    def _load_any_cached_transcript(self, video_id: str) -> Optional[tuple[str, str]]:
+        """Load any cached transcript for a video when preferred-language caches miss."""
+        try:
+            for filename in sorted(os.listdir(self.cache_dir)):
+                if not filename.startswith(f"{video_id}_") or not filename.endswith(
+                    ".json"
+                ):
+                    continue
+
+                language = filename[len(video_id) + 1 : -5]
+                cached_transcript = self._load_from_cache(video_id, language)
+                if cached_transcript:
+                    return (language, cached_transcript)
+        except FileNotFoundError:
+            return None
+
+        return None
+
     def get_transcript(self, video_id: str) -> tuple[str, str, str]:
         """
         Get the transcript for a YouTube video.
@@ -207,6 +225,11 @@ class YouTubeTranscriptExtractor:
                 cached_transcript = self._load_from_cache(video_id, preferred_language)
                 if cached_transcript:
                     return (video_id, preferred_language, cached_transcript)
+
+            fallback_cached_transcript = self._load_any_cached_transcript(video_id)
+            if fallback_cached_transcript:
+                language, transcript = fallback_cached_transcript
+                return (video_id, language, transcript)
 
             # Format the transcript as plain text
             retry_times = 5
