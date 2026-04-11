@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+
 from dotenv import load_dotenv
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"

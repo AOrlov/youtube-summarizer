@@ -57,6 +57,14 @@ def get_logger(name: str) -> logging.Logger:
         A configured logger instance
     """
     logger = logging.getLogger(name)
+
+    if name == "summarizer" or name.startswith("summarizer."):
+        parent_logger = logging.getLogger("summarizer")
+        if not parent_logger.handlers:
+            setup_logging()
+        logger.setLevel(logging.NOTSET)
+        return logger
+
     logger.setLevel(logging.INFO)
 
     if not logger.handlers:
