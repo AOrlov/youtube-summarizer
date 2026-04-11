@@ -11,10 +11,10 @@ from .youtube import YouTubeURLValidator
 
 ALLOWED_SUMMARY_LANGUAGES = {"en", "ru"}
 SUMMARY_LANGUAGE_OPTIONS = (
-    ("en", "English"),
     ("ru", "Russian"),
+    ("en", "English"),
 )
-DEFAULT_SUMMARY_LANGUAGE = "en"
+DEFAULT_SUMMARY_LANGUAGE = "ru"
 MIRRORED_YOUTUBE_HOSTS = {
     "youtube.home",
     "www.youtube.home",

@@ -60,14 +60,14 @@ docker-compose --env-file .env up --build
 
 The web interface provides a simple form where you can:
 - Enter a YouTube video URL
-- Choose the summary output language from English or Russian
+- Choose the summary output language from Russian or English, with Russian selected by default in the web UI
 - Optionally specify the maximum number of tokens for the summary
 - Submit to generate a summary
 
 Supported web entry points:
 - Legacy query flow: open `http://localhost:5100/?video_url=https://www.youtube.com/watch?v=demo` and the page will prefill the form and auto-submit immediately. This remains the entrypoint used by the Firefox extension and is also useful for local/manual testing.
 - Mirrored `youtube.home` flow: if you expose the app on `youtube.home`, direct video routes such as `http://youtube.home/watch?v=dQw4w9WgXcQ` or `http://youtube.home/shorts/dQw4w9WgXcQ` are normalized into the canonical YouTube URL and auto-submitted without manually pasting the video link.
-- Summary language selection: the dropdown controls the summary output language independently from the transcript language and currently supports only English (`en`) and Russian (`ru`).
+- Summary language selection: the dropdown controls the summary output language independently from the transcript language, supports only Russian (`ru`) and English (`en`), and defaults to Russian in the web UI.
 
 ### Firefox Extension
 

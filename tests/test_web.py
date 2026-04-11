@@ -53,13 +53,13 @@ def test_index_renders_summary_language_dropdown_with_explicit_labels(client):
 
     assert response.status_code == 200
     assert 'id="summaryLanguage"' in html
-    assert '<option value="en" selected>English</option>' in html
-    assert '<option value="ru">Russian</option>' in html
+    assert '<option value="ru" selected>Russian</option>' in html
+    assert '<option value="en">English</option>' in html
     assert "Summary language" in html
     assert "Transcript language" in html
     assert "summary_language: summaryLanguageSelect.value" in html
-    assert "marked.parse" not in html
-    assert "summaryElement.textContent = data.summary;" in html
+    assert "marked.parse" in html
+    assert "DOMPurify.sanitize" in html
 
 
 def test_mirrored_watch_route_preserves_summary_language_on_redirect(client):
@@ -110,7 +110,7 @@ def test_mirrored_watch_route_renders_index_with_dropdown_when_following_redirec
 
     assert response.status_code == 200
     assert 'id="summaryLanguage"' in html
-    assert '<option value="en" selected>English</option>' in html
+    assert '<option value="ru" selected>Russian</option>' in html
 
 
 def test_watch_route_redirects_to_root_with_canonical_video_url(client):
@@ -125,7 +125,7 @@ def test_watch_route_redirects_to_root_with_canonical_video_url(client):
     assert location.path == "/"
     assert parse_qs(location.query) == {
         "video_url": ["https://youtube.com/watch?v=dQw4w9WgXcQ&t=43"],
-        "summary_language": ["en"],
+        "summary_language": ["ru"],
     }
 
 
@@ -141,7 +141,7 @@ def test_shorts_route_redirects_to_root_with_canonical_video_url(client):
     assert location.path == "/"
     assert parse_qs(location.query) == {
         "video_url": ["https://youtube.com/shorts/dQw4w9WgXcQ?si=test"],
-        "summary_language": ["en"],
+        "summary_language": ["ru"],
     }
 
 
@@ -156,7 +156,7 @@ def test_explicit_video_url_override_wins_over_mirrored_request(client):
     location = urlparse(response.headers["Location"])
     assert parse_qs(location.query) == {
         "video_url": ["https://youtu.be/dQw4w9WgXcQ"],
-        "summary_language": ["en"],
+        "summary_language": ["ru"],
     }
 
 
