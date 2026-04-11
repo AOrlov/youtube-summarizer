@@ -2,8 +2,8 @@ import logging
 import os
 from urllib.parse import urlencode
 
+import flask
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from .app import YouTubeSummarizer
 from .config import Config
@@ -15,6 +15,11 @@ SUMMARY_LANGUAGE_OPTIONS = (
     ("ru", "Russian"),
 )
 DEFAULT_SUMMARY_LANGUAGE = "en"
+MIRRORED_YOUTUBE_HOSTS = {
+    "youtube.home",
+    "www.youtube.home",
+    "m.youtube.home",
+}
 
 
 def load_environment():
@@ -27,7 +32,7 @@ def load_environment():
         logging.warning("No environment file specified or file not found")
 
 
-app = Flask(__name__)
+app = flask.Flask(__name__)
 
 load_environment()
 config = Config()
@@ -42,11 +47,19 @@ summarizer = YouTubeSummarizer(
 )
 
 
-def get_requested_video_url(path, query_args):
+def is_mirrored_youtube_host(host):
+    """Return True when the request host is one of the mirrored youtube.home hosts."""
+    return host.split(":", 1)[0].lower() in MIRRORED_YOUTUBE_HOSTS
+
+
+def get_requested_video_url(path, query_args, allow_reconstructed_url=True):
     """Return an explicit or reconstructed video URL for the current request."""
     explicit_video_url = query_args.get("video_url")
     if explicit_video_url:
         return explicit_video_url
+
+    if not allow_reconstructed_url:
+        return None
 
     normalized_path = f"/{path.lstrip('/')}" if path else "/"
     filtered_query_items = []
@@ -79,18 +92,31 @@ def get_requested_summary_language(query_args):
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def index(path):
-    requested_video_url = get_requested_video_url(path, request.args)
-    requested_summary_language = get_requested_summary_language(request.args)
+    mirrored_host = is_mirrored_youtube_host(flask.request.host)
+    requested_video_url = get_requested_video_url(
+        path,
+        flask.request.args,
+        allow_reconstructed_url=mirrored_host,
+    )
+    requested_summary_language = get_requested_summary_language(flask.request.args)
     if path and requested_video_url:
-        return redirect(
-            url_for(
+        return flask.redirect(
+            flask.url_for(
                 "index",
                 video_url=requested_video_url,
                 summary_language=requested_summary_language,
             )
         )
 
-    return render_template(
+    if path:
+        if path == "api/summarize":
+            flask.abort(405)
+        if path.startswith("api/") or "." in path.rsplit("/", 1)[-1]:
+            flask.abort(404)
+        if not mirrored_host:
+            flask.abort(404)
+
+    return flask.render_template(
         "index.html",
         default_summary_language=requested_summary_language,
         summary_language_options=SUMMARY_LANGUAGE_OPTIONS,
@@ -100,19 +126,19 @@ def index(path):
 @app.route("/api/summarize", methods=["POST"])
 def summarize():
     try:
-        data = request.get_json(silent=True) or {}
+        data = flask.request.get_json(silent=True) or {}
         video_url = data.get("video_url")
         summary_language = data.get("summary_language")
 
         if not video_url:
-            return jsonify({"error": "Video URL is required"}), 400
+            return flask.jsonify({"error": "Video URL is required"}), 400
 
         if (
             summary_language is not None
             and summary_language not in ALLOWED_SUMMARY_LANGUAGES
         ):
             return (
-                jsonify(
+                flask.jsonify(
                     {
                         "error": "summary_language must be one of: en, ru",
                         "status": "error",
@@ -148,11 +174,11 @@ def summarize():
             "status": status,
         }
 
-        return jsonify(response_payload)
+        return flask.jsonify(response_payload)
 
     except Exception as e:
         status_code = 400 if isinstance(e, ValueError) else 500
-        return jsonify({"error": str(e), "status": "error"}), status_code
+        return flask.jsonify({"error": str(e), "status": "error"}), status_code
 
 
 if __name__ == "__main__":

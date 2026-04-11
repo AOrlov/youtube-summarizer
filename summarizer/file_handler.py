@@ -145,10 +145,17 @@ class FileHandler:
             Path to the summary file if found, None otherwise
         """
         try:
-            pattern = (
+            patterns = [
                 f"summary_{video_id}_{transcript_language}_{summary_language}_*.md"
-            )
-            files = list(self.output_dir.glob(pattern))
+            ]
+            if transcript_language == summary_language:
+                patterns.append(f"summary_{video_id}_{transcript_language}_*.md")
+
+            files = []
+            for pattern in patterns:
+                files = list(self.output_dir.glob(pattern))
+                if files:
+                    break
             if not files:
                 return None
 
@@ -173,22 +180,23 @@ class FileHandler:
         """
         try:
             current_time = datetime.now()
-            for file_path in self.output_dir.glob("summary_*.txt"):
-                try:
-                    file_age = current_time - datetime.fromtimestamp(
-                        file_path.stat().st_mtime
-                    )
-                    if file_age.days > max_age_days:
-                        file_path.unlink()
-                        logger.info(f"Removed old summary file: {file_path}")
-                except PermissionError as e:
-                    logger.error(
-                        f"Permission denied when removing file {file_path}: {str(e)}"
-                    )
-                    raise
-                except Exception as e:
-                    logger.error(f"Error removing file {file_path}: {str(e)}")
-                    continue
+            for pattern in ("summary_*.md", "summary_*.txt"):
+                for file_path in self.output_dir.glob(pattern):
+                    try:
+                        file_age = current_time - datetime.fromtimestamp(
+                            file_path.stat().st_mtime
+                        )
+                        if file_age.days > max_age_days:
+                            file_path.unlink()
+                            logger.info(f"Removed old summary file: {file_path}")
+                    except PermissionError as e:
+                        logger.error(
+                            f"Permission denied when removing file {file_path}: {str(e)}"
+                        )
+                        raise
+                    except Exception as e:
+                        logger.error(f"Error removing file {file_path}: {str(e)}")
+                        continue
 
         except Exception as e:
             logger.error(f"Failed to cleanup old summaries: {str(e)}")

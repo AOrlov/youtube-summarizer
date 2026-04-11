@@ -84,11 +84,27 @@ You can also use the summarizer programmatically:
 from summarizer.app import YouTubeSummarizer
 
 # Initialize the summarizer
-summarizer = YouTubeSummarizer(api_key="your-api-key", language="en")
+summarizer = YouTubeSummarizer(
+    gemini_api_key="your-gemini-api-key",
+    model_name="gemini-2.0-flash",
+    output_dir="output",
+    youtube_api_key="your-youtube-api-key",
+)
 
-# Generate a summary
-summary = summarizer.summarize_video("https://www.youtube.com/watch?v=example")
+# Generate a summary in a specific output language
+summary = summarizer.summarize_video(
+    "https://www.youtube.com/watch?v=example",
+    summary_language="ru",
+)
 print(summary)
+
+# Include transcript data and read the explicit language fields
+result = summarizer.summarize_video(
+    "https://www.youtube.com/watch?v=example",
+    include_transcript=True,
+    summary_language="en",
+)
+print(result["transcript_language"], result["summary_language"])
 ```
 
 ## Development
