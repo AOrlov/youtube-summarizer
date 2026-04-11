@@ -59,6 +59,14 @@
                                 <label for="videoUrl" class="form-label">YouTube Video URL</label>
                                 <input type="url" class="form-control" id="videoUrl" required>
                             </div>
+                            <div class="mb-3">
+                                <label for="summaryLanguage" class="form-label">Summary language</label>
+                                <select class="form-select" id="summaryLanguage">
+                                    {% for value, label in summary_language_options %}
+                                    <option value="{{ value }}"{% if value == default_summary_language %} selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <button type="submit" class="btn btn-primary">Summarize</button>
                                 <small class="text-muted">You will always get the full transcript for copying.</small>
@@ -76,7 +84,10 @@
                                 <h5 class="mb-1">Summary</h5>
                                 <p class="text-muted small mb-0">Generated with Gemini when available.</p>
                             </div>
-                            <span class="badge bg-secondary d-none" id="languageBadge"></span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted small">Summary language</span>
+                                <span class="badge bg-primary d-none" id="summaryLanguageBadge"></span>
+                            </div>
                         </div>
 
                         <div class="alert alert-warning d-none" id="summaryNotice"></div>
@@ -90,9 +101,13 @@
                                 <h5 class="mb-1">Transcript</h5>
                                 <p class="text-muted small mb-0">Copy/paste here if the summary API is rate-limited.</p>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="copyTranscriptBtn">
-                                Copy transcript
-                            </button>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted small">Transcript language</span>
+                                <span class="badge bg-secondary d-none" id="transcriptLanguageBadge"></span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="copyTranscriptBtn">
+                                    Copy transcript
+                                </button>
+                            </div>
                         </div>
 
                         <div class="transcript-container" id="transcript"></div>
@@ -115,14 +130,20 @@
     <script>
         const summarizeForm = document.getElementById('summarizeForm');
         const videoUrlInput = document.getElementById('videoUrl');
+        const summaryLanguageSelect = document.getElementById('summaryLanguage');
         const resultCard = document.getElementById('resultCard');
         const progressCard = document.getElementById('progressCard');
         const summaryElement = document.getElementById('summary');
         const transcriptElement = document.getElementById('transcript');
         const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
-        const languageBadge = document.getElementById('languageBadge');
+        const summaryLanguageBadge = document.getElementById('summaryLanguageBadge');
+        const transcriptLanguageBadge = document.getElementById('transcriptLanguageBadge');
         const summaryNotice = document.getElementById('summaryNotice');
         const errorAlert = document.getElementById('errorAlert');
+        const summaryLanguageLabels = {
+            en: 'English',
+            ru: 'Russian'
+        };
 
         const setLoading = (isLoading) => {
             progressCard.style.display = isLoading ? 'block' : 'none';
@@ -132,11 +153,20 @@
             errorAlert.classList.add('d-none');
             resultCard.classList.add('d-none');
             summaryNotice.classList.add('d-none');
-            languageBadge.classList.add('d-none');
+            summaryLanguageBadge.classList.add('d-none');
+            transcriptLanguageBadge.classList.add('d-none');
             summaryElement.innerHTML = '';
             transcriptElement.textContent = '';
             copyTranscriptBtn.disabled = true;
             copyTranscriptBtn.textContent = 'Copy transcript';
+        };
+
+        const formatLanguageLabel = (languageCode) => {
+            if (!languageCode) {
+                return '';
+            }
+
+            return summaryLanguageLabels[languageCode] || languageCode.toUpperCase();
         };
 
         const canUseAsyncClipboard = () =>
@@ -195,9 +225,16 @@
             transcriptElement.textContent = hasTranscript ? data.transcript : 'Transcript unavailable.';
             copyTranscriptBtn.disabled = !hasTranscript;
 
-            if (data.language) {
-                languageBadge.textContent = `Language: ${data.language}`;
-                languageBadge.classList.remove('d-none');
+            const transcriptLanguage = data.transcript_language || data.language;
+            if (transcriptLanguage) {
+                transcriptLanguageBadge.textContent = formatLanguageLabel(transcriptLanguage);
+                transcriptLanguageBadge.classList.remove('d-none');
+            }
+
+            const summaryLanguage = data.summary_language || transcriptLanguage;
+            if (summaryLanguage) {
+                summaryLanguageBadge.textContent = formatLanguageLabel(summaryLanguage);
+                summaryLanguageBadge.classList.remove('d-none');
             }
 
             resultCard.classList.remove('d-none');
@@ -221,7 +258,8 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        video_url: videoUrl
+                        video_url: videoUrl,
+                        summary_language: summaryLanguageSelect.value
                     })
                 });
 
@@ -254,6 +292,11 @@
         const initializeFromQuery = () => {
             const params = new URLSearchParams(window.location.search);
             const prefilledUrl = params.get('video_url') || params.get('video');
+            const requestedSummaryLanguage = params.get('summary_language');
+
+            if (summaryLanguageLabels[requestedSummaryLanguage]) {
+                summaryLanguageSelect.value = requestedSummaryLanguage;
+            }
 
             if (!prefilledUrl) {
                 return;
@@ -265,7 +308,7 @@
                 videoUrlInput.value = prefilledUrl;
             }
 
-            // Trigger summarization automatically when coming from the extension
+            // Trigger summarization automatically for direct video-entry routes.
             summarizeForm.dispatchEvent(new Event('submit', { cancelable: true }));
         };
 
