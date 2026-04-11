@@ -8,6 +8,8 @@ from .youtube import YouTubeTranscriptExtractor, YouTubeURLValidator
 
 logger = get_logger(__name__)
 
+ALLOWED_SUMMARY_LANGUAGES = {"en", "ru"}
+
 
 class YouTubeSummarizer:
     """Main class for summarizing YouTube videos."""
@@ -29,20 +31,30 @@ class YouTubeSummarizer:
             model_name: The name of the Gemini model to use
         """
         self.url_validator = YouTubeURLValidator()
-        self.transcript_extractor = YouTubeTranscriptExtractor(
-            api_key=youtube_api_key)
+        self.transcript_extractor = YouTubeTranscriptExtractor(api_key=youtube_api_key)
         self.summarizer = GeminiSummarizer(gemini_api_key, model_name)
         self.file_handler = FileHandler(output_dir)
 
         logger.info(f"Initialized YouTubeSummarizer with model: {model_name}")
 
-    def _validate_inputs(self, video_url: str, max_tokens: Optional[int]) -> None:
+    def _validate_inputs(
+        self,
+        video_url: str,
+        max_tokens: Optional[int],
+        summary_language: Optional[str] = None,
+    ) -> None:
         """Validate input parameters."""
         if not self.url_validator.is_valid_url(video_url):
             raise ValueError("Invalid YouTube URL")
 
         if max_tokens is not None and max_tokens <= 0:
             raise ValueError("max_tokens must be positive")
+
+        if (
+            summary_language is not None
+            and summary_language not in ALLOWED_SUMMARY_LANGUAGES
+        ):
+            raise ValueError("summary_language must be one of: en, ru")
 
     def summarize_video(
         self,
@@ -52,6 +64,7 @@ class YouTubeSummarizer:
         metadata: Optional[Dict[str, Any]] = None,
         include_transcript: bool = False,
         allow_summary_failure: bool = False,
+        summary_language: Optional[str] = None,
     ) -> Union[str, Dict[str, Any]]:
         """
         Extract transcript and generate summary for a YouTube video.
@@ -63,6 +76,7 @@ class YouTubeSummarizer:
             metadata: Optional metadata to save with the summary
             include_transcript: Whether to return the transcript along with the summary
             allow_summary_failure: If True, return transcript even when summary generation fails
+            summary_language: Optional summary output language code
 
         Returns:
             The generated summary or a dictionary containing both summary and transcript when requested
@@ -73,7 +87,7 @@ class YouTubeSummarizer:
         """
         try:
             # Validate inputs
-            self._validate_inputs(video_url, max_tokens)
+            self._validate_inputs(video_url, max_tokens, summary_language)
 
             logger.info(f"Processing video: {video_url}")
 
@@ -87,6 +101,7 @@ class YouTubeSummarizer:
                 video_id
             )
             logger.info(f"Extracted transcript for video {video_id}")
+            requested_summary_language = summary_language or video_lang
 
             # Try loading summary from cache using the actual transcript language
             summary_path = self.file_handler.get_summary_path(video_id, video_lang)
@@ -102,7 +117,7 @@ class YouTubeSummarizer:
             if summary is None:
                 try:
                     summary = self.summarizer.summarize(
-                        transcript, video_lang, max_tokens
+                        transcript, requested_summary_language, max_tokens
                     )
                     logger.info(f"Generated summary for video {video_id}")
                 except Exception as e:
@@ -113,15 +128,14 @@ class YouTubeSummarizer:
 
             # Save summary if requested and newly generated
             if save_to_file and summary and not summary_path:
-                self.file_handler.save_summary(
-                    video_id, video_lang, summary, metadata
-                )
+                self.file_handler.save_summary(video_id, video_lang, summary, metadata)
                 logger.info(f"Saved summary for video {video_id}")
 
             if include_transcript:
                 return {
                     "video_id": video_id,
-                    "language": video_lang,
+                    "transcript_language": video_lang,
+                    "summary_language": requested_summary_language,
                     "transcript": transcript,
                     "summary": summary,
                     "summary_error": summary_error,
