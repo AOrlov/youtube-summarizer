@@ -113,9 +113,8 @@ class YouTubeSummarizer:
 
             if summary_path and summary_path.exists():
                 logger.info(f"Found existing summary for video {video_id}")
-                with open(summary_path, "r", encoding="utf-8") as f:
-                    summary = f.read()
-                summary_loaded_from_cache = True
+                summary = self.file_handler.load_summary(summary_path)
+                summary_loaded_from_cache = summary is not None
 
             # Generate summary if not cached
             if summary is None:
