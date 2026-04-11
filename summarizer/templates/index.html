@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Video Summarizer</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         .summary-container {
             white-space: pre-wrap;
@@ -155,7 +154,7 @@
             summaryNotice.classList.add('d-none');
             summaryLanguageBadge.classList.add('d-none');
             transcriptLanguageBadge.classList.add('d-none');
-            summaryElement.innerHTML = '';
+            summaryElement.textContent = '';
             transcriptElement.textContent = '';
             copyTranscriptBtn.disabled = true;
             copyTranscriptBtn.textContent = 'Copy transcript';
@@ -212,9 +211,9 @@
             const hasTranscript = Boolean(data.transcript);
 
             if (hasSummary) {
-                summaryElement.innerHTML = marked.parse(data.summary);
+                summaryElement.textContent = data.summary;
             } else {
-                summaryElement.innerHTML = '<p class="text-muted mb-0">Summary is unavailable. Use the transcript below.</p>';
+                summaryElement.textContent = 'Summary is unavailable. Use the transcript below.';
             }
 
             if (data.summary_error) {

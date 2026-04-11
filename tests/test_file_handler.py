@@ -80,6 +80,19 @@ def test_get_summary_path_falls_back_to_legacy_same_language_cache(tmp_path):
     assert handler.get_summary_path("video123", "en", "ru") is None
 
 
+def test_load_summary_extracts_body_without_metadata(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    summary_path = handler.save_summary(
+        "video123",
+        "en",
+        "ru",
+        "Summary body",
+        metadata={"title": "Example"},
+    )
+
+    assert handler.load_summary(summary_path) == "Summary body"
+
+
 def test_cleanup_old_summaries_removes_aged_markdown_files(tmp_path):
     handler = FileHandler(str(tmp_path))
     old_path = handler.save_summary("video123", "en", "en", "Old summary")
@@ -136,7 +149,7 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
         save_to_file=True,
         summary_language="ru",
     )
-    summarizer.summarize_video(
+    cached_english_summary = summarizer.summarize_video(
         video_url=video_url,
         save_to_file=True,
         summary_language="en",
@@ -144,6 +157,7 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
 
     assert english_summary == "en summary"
     assert russian_summary == "ru summary"
+    assert cached_english_summary == "en summary"
     assert fake_gemini_summarizer.calls == [
         {
             "transcript": "Transcript text",

@@ -127,6 +127,36 @@ class FileHandler:
             logger.error(f"Unexpected error when saving summary: {str(e)}")
             raise
 
+    def load_summary(self, file_path: Path) -> Optional[str]:
+        """
+        Load the summary body from a saved summary artifact.
+
+        Args:
+            file_path: Path to the saved summary file
+
+        Returns:
+            The extracted summary body, or None if the file cannot be read
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            summary_prefix = "## Summary\n"
+            metadata_marker = "\n\n## Metadata\n"
+
+            if not content.startswith(summary_prefix):
+                return content
+
+            summary_body = content[len(summary_prefix) :]
+            if metadata_marker in summary_body:
+                summary_body = summary_body.split(metadata_marker, 1)[0]
+
+            return summary_body.rstrip()
+
+        except Exception as e:
+            logger.warning(f"Failed to load summary from {file_path}: {str(e)}")
+            return None
+
     def get_summary_path(
         self,
         video_id: str,

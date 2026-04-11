@@ -58,6 +58,8 @@ def test_index_renders_summary_language_dropdown_with_explicit_labels(client):
     assert "Summary language" in html
     assert "Transcript language" in html
     assert "summary_language: summaryLanguageSelect.value" in html
+    assert "marked.parse" not in html
+    assert "summaryElement.textContent = data.summary;" in html
 
 
 def test_mirrored_watch_route_preserves_summary_language_on_redirect(client):
