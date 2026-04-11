@@ -52,12 +52,13 @@ def is_mirrored_youtube_host(host):
     return host.split(":", 1)[0].lower() in MIRRORED_YOUTUBE_HOSTS
 
 
-def get_requested_video_url(path, query_args, allow_reconstructed_url=True):
-    """Return an explicit or reconstructed video URL for the current request."""
-    explicit_video_url = query_args.get("video_url")
-    if explicit_video_url:
-        return explicit_video_url
+def get_explicit_video_url(query_args):
+    """Return the explicit video URL query parameter when present."""
+    return query_args.get("video_url")
 
+
+def get_requested_video_url(path, query_args, allow_reconstructed_url=True):
+    """Return a reconstructed video URL for the current request path."""
     if not allow_reconstructed_url:
         return None
 
@@ -93,20 +94,14 @@ def get_requested_summary_language(query_args):
 @app.route("/<path:path>")
 def index(path):
     mirrored_host = is_mirrored_youtube_host(flask.request.host)
-    requested_video_url = get_requested_video_url(
+    explicit_video_url = get_explicit_video_url(flask.request.args)
+    reconstructed_video_url = get_requested_video_url(
         path,
         flask.request.args,
         allow_reconstructed_url=mirrored_host,
     )
+    requested_video_url = explicit_video_url or reconstructed_video_url
     requested_summary_language = get_requested_summary_language(flask.request.args)
-    if path and requested_video_url:
-        return flask.redirect(
-            flask.url_for(
-                "index",
-                video_url=requested_video_url,
-                summary_language=requested_summary_language,
-            )
-        )
 
     if path:
         if path == "api/summarize":
@@ -115,9 +110,18 @@ def index(path):
             flask.abort(404)
         if not mirrored_host:
             flask.abort(404)
+        if reconstructed_video_url:
+            return flask.redirect(
+                flask.url_for(
+                    "index",
+                    video_url=requested_video_url,
+                    summary_language=requested_summary_language,
+                )
+            )
 
     return flask.render_template(
         "index.html",
+        allow_query_autosubmit=not path,
         default_summary_language=requested_summary_language,
         summary_language_options=SUMMARY_LANGUAGE_OPTIONS,
     )

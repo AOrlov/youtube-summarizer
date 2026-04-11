@@ -81,6 +81,20 @@ def test_invalid_non_video_urls_are_rejected():
             validator.validate_url(url)
 
 
+def test_non_http_youtube_schemes_are_rejected():
+    validator = YouTubeURLValidator()
+    urls = [
+        "javascript://youtube.com/watch?v=dQw4w9WgXcQ",
+        "ftp://youtu.be/dQw4w9WgXcQ",
+    ]
+
+    for url in urls:
+        assert validator.extract_video_id(url) is None
+        assert not validator.is_valid_url(url)
+        with pytest.raises(ValueError):
+            validator.validate_url(url)
+
+
 def test_transcript_extractor_returns_cached_transcript(tmp_path):
     extractor = YouTubeTranscriptExtractor(cache_dir=str(tmp_path))
     extractor._save_to_cache("video123", "ru", "cached transcript")

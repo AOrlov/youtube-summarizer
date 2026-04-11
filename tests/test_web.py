@@ -87,6 +87,7 @@ def test_root_query_renders_selected_summary_language_and_autosubmit_script(clie
 
     assert response.status_code == 200
     assert '<option value="ru" selected>Russian</option>' in html
+    assert "const allowQueryAutoSubmit = true;" in html
     assert (
         "const prefilledUrl = params.get('video_url') || params.get('video');" in html
     )
@@ -176,14 +177,41 @@ def test_invalid_non_video_path_with_v_query_does_not_redirect(client):
     assert b"YouTube Video Summarizer" in response.data
 
 
+def test_invalid_non_video_path_with_explicit_video_url_does_not_redirect(client):
+    response = client.get(
+        "/channel/test?video_url=https://youtube.com/watch?v=dQw4w9WgXcQ",
+        base_url="http://youtube.home",
+    )
+
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert b"YouTube Video Summarizer" in response.data
+    assert "const allowQueryAutoSubmit = false;" in html
+
+
 def test_non_mirrored_unknown_path_returns_404(client):
     response = client.get("/channel/test")
 
     assert response.status_code == 404
 
 
+def test_non_mirrored_unknown_path_with_explicit_video_url_returns_404(client):
+    response = client.get("/foo?video_url=https://youtube.com/watch?v=dQw4w9WgXcQ")
+
+    assert response.status_code == 404
+
+
 def test_api_summarize_get_keeps_method_not_allowed(client):
     response = client.get("/api/summarize")
+
+    assert response.status_code == 405
+
+
+def test_api_summarize_get_with_video_url_keeps_method_not_allowed(client):
+    response = client.get(
+        "/api/summarize?video_url=https://youtube.com/watch?v=dQw4w9WgXcQ"
+    )
 
     assert response.status_code == 405
 

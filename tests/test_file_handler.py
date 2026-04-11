@@ -102,6 +102,25 @@ def test_load_summary_extracts_body_without_metadata(tmp_path):
     assert handler.load_summary(summary_path) == "Summary body"
 
 
+def test_load_summary_round_trips_embedded_metadata_heading(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    summary_text = "Intro\n\n## Metadata\nThis heading belongs to the summary."
+    summary_path = handler.save_summary("video123", "en", "ru", summary_text)
+
+    assert handler.load_summary(summary_path) == summary_text
+
+
+def test_load_summary_supports_legacy_metadata_delimiter(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    legacy_summary_path = tmp_path / "summary_video123_en_en_20260101_010101.md"
+    legacy_summary_path.write_text(
+        "## Summary\nLegacy summary body\n\n## Metadata\n- **title**: Example\n",
+        encoding="utf-8",
+    )
+
+    assert handler.load_summary(legacy_summary_path) == "Legacy summary body"
+
+
 def test_cleanup_old_summaries_removes_aged_markdown_files(tmp_path):
     handler = FileHandler(str(tmp_path))
     old_path = handler.save_summary("video123", "en", "en", "Old summary")
