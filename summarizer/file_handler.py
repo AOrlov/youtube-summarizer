@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -157,6 +158,17 @@ class FileHandler:
             logger.warning(f"Failed to load summary from {file_path}: {str(e)}")
             return None
 
+    @staticmethod
+    def _is_legacy_summary_name(
+        file_path: Path, video_id: str, transcript_language: str
+    ) -> bool:
+        """Return True for pre-summary-language cache filenames only."""
+        legacy_pattern = re.compile(
+            rf"^summary_{re.escape(video_id)}_{re.escape(transcript_language)}_"
+            r"\d{8}_\d{6}\.md$"
+        )
+        return legacy_pattern.match(file_path.name) is not None
+
     def get_summary_path(
         self,
         video_id: str,
@@ -175,17 +187,21 @@ class FileHandler:
             Path to the summary file if found, None otherwise
         """
         try:
-            patterns = [
-                f"summary_{video_id}_{transcript_language}_{summary_language}_*.md"
-            ]
-            if transcript_language == summary_language:
-                patterns.append(f"summary_{video_id}_{transcript_language}_*.md")
-
-            files = []
-            for pattern in patterns:
-                files = list(self.output_dir.glob(pattern))
-                if files:
-                    break
+            files = list(
+                self.output_dir.glob(
+                    f"summary_{video_id}_{transcript_language}_{summary_language}_*.md"
+                )
+            )
+            if not files and transcript_language == summary_language:
+                files = [
+                    file_path
+                    for file_path in self.output_dir.glob(
+                        f"summary_{video_id}_{transcript_language}_*.md"
+                    )
+                    if self._is_legacy_summary_name(
+                        file_path, video_id, transcript_language
+                    )
+                ]
             if not files:
                 return None
 
