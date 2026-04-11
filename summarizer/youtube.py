@@ -24,6 +24,7 @@ class YouTubeURLValidator:
         "m.youtube.home",
     }
     SHORT_DOMAINS = {"youtu.be", "www.youtu.be"}
+    ALLOWED_SCHEMES = {"http", "https"}
     SCHEME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
     def _normalize_url(self, url: str) -> Optional[str]:
@@ -36,6 +37,9 @@ class YouTubeURLValidator:
             return None
 
         if self.SCHEME_PATTERN.match(candidate):
+            parsed = urlparse(candidate)
+            if parsed.scheme.lower() not in self.ALLOWED_SCHEMES:
+                return None
             return candidate
 
         bare_domain_prefixes = tuple(self.YOUTUBE_DOMAINS | self.SHORT_DOMAINS)

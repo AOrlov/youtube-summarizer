@@ -139,6 +139,7 @@
         const transcriptLanguageBadge = document.getElementById('transcriptLanguageBadge');
         const summaryNotice = document.getElementById('summaryNotice');
         const errorAlert = document.getElementById('errorAlert');
+        const allowQueryAutoSubmit = {{ allow_query_autosubmit | tojson }};
         const summaryLanguageLabels = {
             en: 'English',
             ru: 'Russian'
@@ -305,6 +306,10 @@
                 videoUrlInput.value = decodeURIComponent(prefilledUrl);
             } catch (error) {
                 videoUrlInput.value = prefilledUrl;
+            }
+
+            if (!allowQueryAutoSubmit) {
+                return;
             }
 
             // Trigger summarization automatically for direct video-entry routes.

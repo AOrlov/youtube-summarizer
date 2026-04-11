@@ -8,6 +8,8 @@ from .utils import get_logger
 
 logger = get_logger(__name__)
 
+SUMMARY_BODY_LENGTH_MARKER = "<!--SUMMARY_BODY_LENGTH:{length}-->\n"
+
 
 class FileHandler:
     """Handles file operations for saving summaries and managing output directories."""
@@ -101,7 +103,7 @@ class FileHandler:
             summary_metadata["summary_language"] = summary_language
 
             # Prepare markdown content
-            markdown_content = f"""## Summary
+            markdown_content = f"""{SUMMARY_BODY_LENGTH_MARKER.format(length=len(summary))}## Summary
 {summary}
 
 ## Metadata
@@ -142,6 +144,14 @@ class FileHandler:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
+            summary_length = None
+            summary_length_match = re.match(
+                r"\A<!--SUMMARY_BODY_LENGTH:(\d+)-->\n", content
+            )
+            if summary_length_match:
+                summary_length = int(summary_length_match.group(1))
+                content = content[summary_length_match.end() :]
+
             summary_prefix = "## Summary\n"
             metadata_marker = "\n\n## Metadata\n"
 
@@ -149,6 +159,9 @@ class FileHandler:
                 return content
 
             summary_body = content[len(summary_prefix) :]
+            if summary_length is not None:
+                return summary_body[:summary_length]
+
             if metadata_marker in summary_body:
                 summary_body = summary_body.split(metadata_marker, 1)[0]
 
