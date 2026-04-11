@@ -59,11 +59,11 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 - Modify: `summarizer/file_handler.py`
 - Create: `tests/test_file_handler.py`
 
-- [ ] change summary cache lookup and save behavior so cache keys include both transcript language and requested summary language
-- [ ] record transcript language and summary language separately in saved summary metadata and filenames
-- [ ] keep transcript caching unchanged so transcript reuse still works independently of summary output language
-- [ ] write tests that prove switching the dropdown from English to Russian does not return a stale cached summary in the wrong language
-- [ ] run `python -m pytest tests/test_file_handler.py tests/test_web.py` - must pass before task 4
+- [x] change summary cache lookup and save behavior so cache keys include both transcript language and requested summary language
+- [x] record transcript language and summary language separately in saved summary metadata and filenames
+- [x] keep transcript caching unchanged so transcript reuse still works independently of summary output language
+- [x] write tests that prove switching the dropdown from English to Russian does not return a stale cached summary in the wrong language
+- [x] run `python -m pytest tests/test_file_handler.py tests/test_web.py` - passed via `./venv/bin/python -m pytest tests/test_file_handler.py tests/test_web.py` because this environment does not provide a `python` alias
 
 ### Task 4: Add the English/Russian dropdown and auto-submit UI flow
 
