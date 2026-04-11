@@ -164,6 +164,28 @@ def test_invalid_non_video_path_renders_index_without_redirect(client):
     assert b"YouTube Video Summarizer" in response.data
 
 
+def test_invalid_non_video_path_with_v_query_does_not_redirect(client):
+    response = client.get(
+        "/channel/test?v=dQw4w9WgXcQ",
+        base_url="http://youtube.home",
+    )
+
+    assert response.status_code == 200
+    assert b"YouTube Video Summarizer" in response.data
+
+
+def test_non_mirrored_unknown_path_returns_404(client):
+    response = client.get("/channel/test")
+
+    assert response.status_code == 404
+
+
+def test_api_summarize_get_keeps_method_not_allowed(client):
+    response = client.get("/api/summarize")
+
+    assert response.status_code == 405
+
+
 def test_api_summarize_passes_summary_language_and_returns_distinct_fields(
     client, web_module
 ):
@@ -195,6 +217,55 @@ def test_api_summarize_passes_summary_language_and_returns_distinct_fields(
             "summary_language": "ru",
         }
     ]
+
+
+def test_api_summarize_defaults_summary_language_to_transcript_language(
+    client, web_module
+):
+    response = client.post(
+        "/api/summarize",
+        json={"video_url": "https://youtube.com/watch?v=dQw4w9WgXcQ"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["summary_language"] == "en"
+    assert web_module.summarizer.calls == [
+        {
+            "video_url": "https://youtube.com/watch?v=dQw4w9WgXcQ",
+            "max_tokens": web_module.config.max_tokens,
+            "include_transcript": True,
+            "allow_summary_failure": True,
+            "summary_language": None,
+        }
+    ]
+
+
+def test_api_summarize_returns_partial_success_when_summary_is_missing(
+    client, web_module
+):
+    web_module.summarizer.next_result.update(
+        {
+            "summary": None,
+            "summary_error": "Gemini failed",
+        }
+    )
+
+    response = client.post(
+        "/api/summarize",
+        json={"video_url": "https://youtube.com/watch?v=dQw4w9WgXcQ"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "summary": None,
+        "transcript": "transcript",
+        "transcript_language": "en",
+        "summary_language": "en",
+        "language": "en",
+        "video_id": "video123",
+        "summary_error": "Gemini failed",
+        "status": "partial_success",
+    }
 
 
 def test_api_summarize_rejects_invalid_summary_language(client, web_module):

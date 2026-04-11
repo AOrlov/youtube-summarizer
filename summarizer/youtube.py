@@ -90,11 +90,6 @@ class YouTubeURLValidator:
             if segments:
                 return segments[0]
 
-        if netloc in self.YOUTUBE_DOMAINS:
-            query = parse_qs(parsed.query)
-            if "v" in query and query["v"]:
-                return query["v"][0]
-
         return None
 
     def is_valid_url(self, url: str) -> bool:

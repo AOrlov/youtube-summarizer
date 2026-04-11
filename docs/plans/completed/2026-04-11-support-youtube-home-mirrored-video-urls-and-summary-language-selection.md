@@ -87,7 +87,7 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 - [x] run `python -m pytest tests/` - passed via `./venv/bin/python -m pytest tests/` because this environment does not provide a `python` alias
 - [x] run `black --check .` - passed via `./venv/bin/black --check .`
 - [x] run `isort --check-only .` - passed via `./venv/bin/isort --check-only .`
-- [x] verify test coverage meets 80%+ using the project coverage command or CI job before merge (skipped - not automatable in this environment because `pytest-cov`/`coverage` is not installed and `./venv/bin/python -m pytest --cov=summarizer tests/` is rejected)
+- [ ] verify test coverage meets 80%+ using the project coverage command or CI job before merge (not verified in this environment because `pytest-cov`/`coverage` is not installed and `./venv/bin/python -m pytest --cov=summarizer tests/` is rejected)
 
 ### Task 6: Update documentation
 

@@ -1,3 +1,5 @@
+import os
+
 import summarizer.app as app_module
 from summarizer.file_handler import FileHandler
 
@@ -67,6 +69,27 @@ def test_get_summary_path_distinguishes_summary_language(tmp_path):
     assert handler.get_summary_path("video123", "en", "en") == english_path
     assert handler.get_summary_path("video123", "en", "ru") == russian_path
     assert handler.get_summary_path("video123", "ru", "ru") is None
+
+
+def test_get_summary_path_falls_back_to_legacy_same_language_cache(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    legacy_path = tmp_path / "summary_video123_en_20260101_010101.md"
+    legacy_path.write_text("Legacy summary", encoding="utf-8")
+
+    assert handler.get_summary_path("video123", "en", "en") == legacy_path
+    assert handler.get_summary_path("video123", "en", "ru") is None
+
+
+def test_cleanup_old_summaries_removes_aged_markdown_files(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    old_path = handler.save_summary("video123", "en", "en", "Old summary")
+    fresh_path = handler.save_summary("video123", "en", "ru", "Fresh summary")
+    os.utime(old_path, (0, 0))
+
+    handler.cleanup_old_summaries(max_age_days=30)
+
+    assert not old_path.exists()
+    assert fresh_path.exists()
 
 
 def test_summarizer_cache_separates_transcript_and_summary_languages(
