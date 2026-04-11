@@ -30,11 +30,11 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 - Modify: `tests/test_youtube.py`
 - Create: `tests/test_web.py`
 
-- [ ] add a catch-all GET route so paths like `/watch?...` and `/shorts/...` render the summarizer page instead of returning 404
-- [ ] normalize incoming `youtube.home` request path and query into a canonical `https://youtube.com/...` video URL while still honoring explicit `?video_url=` overrides
-- [ ] extend URL parsing to accept the mirrored direct-video formats the new flow depends on, especially standard watch URLs and shorts URLs
-- [ ] write tests for mirrored request handling, canonical URL reconstruction, and invalid non-video paths
-- [ ] run `python -m pytest tests/test_youtube.py tests/test_web.py` - must pass before task 2
+- [x] add a catch-all GET route so paths like `/watch?...` and `/shorts/...` render the summarizer page instead of returning 404
+- [x] normalize incoming `youtube.home` request path and query into a canonical `https://youtube.com/...` video URL while still honoring explicit `?video_url=` overrides
+- [x] extend URL parsing to accept the mirrored direct-video formats the new flow depends on, especially standard watch URLs and shorts URLs
+- [x] write tests for mirrored request handling, canonical URL reconstruction, and invalid non-video paths
+- [x] run `python -m pytest tests/test_youtube.py tests/test_web.py` - passed via `./venv/bin/python -m pytest tests/test_youtube.py tests/test_web.py` because `python` is unavailable in this environment
 
 ### Task 2: Add summary-language selection to the API and summarizer
 

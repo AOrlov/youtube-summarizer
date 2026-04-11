@@ -18,18 +18,47 @@ logger = get_logger(__name__)
 class YouTubeURLValidator:
     """Class for validating YouTube URLs and extracting video IDs."""
 
-    # Regular expressions for different YouTube URL formats
-    URL_PATTERNS = [
-        # Standard URL
-        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([^&]+)",
-        r"(?:https?://)?(?:www\.)?youtube\.com/embed/([^/?]+)",  # Embed URL
-        r"(?:https?://)?(?:www\.)?youtu\.be/([^/?]+)",  # Short URL
-        r"(?:https?://)?(?:www\.)?youtube\.com/v/([^/?]+)",  # Old format
-    ]
+    YOUTUBE_DOMAINS = {
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "youtube.home",
+        "www.youtube.home",
+        "m.youtube.home",
+    }
+    SHORT_DOMAINS = {"youtu.be", "www.youtu.be"}
+    SCHEME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
-    def __init__(self):
-        """Initialize the validator with compiled regex patterns."""
-        self.patterns = [re.compile(pattern) for pattern in self.URL_PATTERNS]
+    def _normalize_url(self, url: str) -> Optional[str]:
+        """Normalize partial YouTube URLs so urlparse can inspect them."""
+        if not url:
+            return None
+
+        candidate = url.strip()
+        if not candidate:
+            return None
+
+        if self.SCHEME_PATTERN.match(candidate):
+            return candidate
+
+        bare_domain_prefixes = tuple(self.YOUTUBE_DOMAINS | self.SHORT_DOMAINS)
+        if candidate.startswith(bare_domain_prefixes):
+            return f"https://{candidate}"
+
+        return candidate
+
+    @staticmethod
+    def _extract_path_segment(path: str, prefix: str) -> Optional[str]:
+        normalized_path = path.strip("/")
+        expected_prefix = f"{prefix}/"
+        if not normalized_path.startswith(expected_prefix):
+            return None
+
+        segments = normalized_path.split("/")
+        if len(segments) < 2 or not segments[1]:
+            return None
+
+        return segments[1]
 
     def extract_video_id(self, url: str) -> Optional[str]:
         """
@@ -41,17 +70,32 @@ class YouTubeURLValidator:
         Returns:
             The video ID if found, None otherwise
         """
-        # Try each pattern
-        for pattern in self.patterns:
-            match = pattern.search(url)
-            if match:
-                return match.group(1)
+        normalized_url = self._normalize_url(url)
+        if not normalized_url:
+            return None
 
-        # Try parsing as a standard URL with query parameters
-        parsed = urlparse(url)
-        if parsed.netloc in ["www.youtube.com", "youtube.com"]:
+        parsed = urlparse(normalized_url)
+        netloc = parsed.netloc.lower()
+
+        if netloc in self.YOUTUBE_DOMAINS:
+            if parsed.path == "/watch":
+                query = parse_qs(parsed.query)
+                if "v" in query and query["v"]:
+                    return query["v"][0]
+
+            for prefix in ("shorts", "embed", "v"):
+                video_id = self._extract_path_segment(parsed.path, prefix)
+                if video_id:
+                    return video_id
+
+        if netloc in self.SHORT_DOMAINS:
+            segments = [segment for segment in parsed.path.split("/") if segment]
+            if segments:
+                return segments[0]
+
+        if netloc in self.YOUTUBE_DOMAINS:
             query = parse_qs(parsed.query)
-            if "v" in query:
+            if "v" in query and query["v"]:
                 return query["v"][0]
 
         return None
@@ -265,7 +309,7 @@ class YouTubeTranscriptExtractor:
             Exception: If there's an error fetching the languages
         """
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript_list = YouTubeTranscriptApi().list(video_id)
             return [transcript.language_code for transcript in transcript_list]
         except Exception as e:
             raise Exception(f"Error fetching available languages: {str(e)}")
