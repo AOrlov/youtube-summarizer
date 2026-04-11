@@ -72,12 +72,12 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 - Modify: `summarizer/web.py`
 - Modify: `tests/test_web.py`
 
-- [ ] add a dropdown to the form with only two options: English and Russian
-- [ ] include the selected summary language in the existing POST payload
-- [ ] auto-populate and auto-submit when the page is opened through the mirrored `youtube.home` route, while preserving the current `?video_url=` auto-submit behavior
-- [ ] update result labels so transcript language and summary language are shown explicitly and no longer conflated in a single badge
-- [ ] write template/render tests that assert the dropdown exists and the page still renders correctly for both root and mirrored video routes
-- [ ] run `python -m pytest tests/test_web.py` - must pass before task 5
+- [x] add a dropdown to the form with only two options: English and Russian
+- [x] include the selected summary language in the existing POST payload
+- [x] auto-populate and auto-submit when the page is opened through the mirrored `youtube.home` route, while preserving the current `?video_url=` auto-submit behavior
+- [x] update result labels so transcript language and summary language are shown explicitly and no longer conflated in a single badge
+- [x] write template/render tests that assert the dropdown exists and the page still renders correctly for both root and mirrored video routes
+- [x] run `python -m pytest tests/test_web.py` - passed via `./venv/bin/python -m pytest tests/test_web.py` because this environment does not provide a `python` alias
 
 ### Task 5: Verify acceptance criteria
 

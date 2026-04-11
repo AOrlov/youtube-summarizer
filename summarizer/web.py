@@ -10,6 +10,11 @@ from .config import Config
 from .youtube import YouTubeURLValidator
 
 ALLOWED_SUMMARY_LANGUAGES = {"en", "ru"}
+SUMMARY_LANGUAGE_OPTIONS = (
+    ("en", "English"),
+    ("ru", "Russian"),
+)
+DEFAULT_SUMMARY_LANGUAGE = "en"
 
 
 def load_environment():
@@ -47,7 +52,7 @@ def get_requested_video_url(path, query_args):
     filtered_query_items = []
 
     for key, values in query_args.lists():
-        if key == "video_url":
+        if key in {"video_url", "summary_language"}:
             continue
         for value in values:
             filtered_query_items.append((key, value))
@@ -62,14 +67,34 @@ def get_requested_video_url(path, query_args):
     return None
 
 
+def get_requested_summary_language(query_args):
+    """Return a valid requested summary language or the default."""
+    summary_language = query_args.get("summary_language")
+    if summary_language in ALLOWED_SUMMARY_LANGUAGES:
+        return summary_language
+
+    return DEFAULT_SUMMARY_LANGUAGE
+
+
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def index(path):
     requested_video_url = get_requested_video_url(path, request.args)
+    requested_summary_language = get_requested_summary_language(request.args)
     if path and requested_video_url:
-        return redirect(url_for("index", video_url=requested_video_url))
+        return redirect(
+            url_for(
+                "index",
+                video_url=requested_video_url,
+                summary_language=requested_summary_language,
+            )
+        )
 
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        default_summary_language=requested_summary_language,
+        summary_language_options=SUMMARY_LANGUAGE_OPTIONS,
+    )
 
 
 @app.route("/api/summarize", methods=["POST"])
