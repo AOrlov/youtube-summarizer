@@ -80,6 +80,15 @@ def test_get_summary_path_falls_back_to_legacy_same_language_cache(tmp_path):
     assert handler.get_summary_path("video123", "en", "ru") is None
 
 
+def test_get_summary_path_same_language_does_not_match_new_other_language_cache(
+    tmp_path,
+):
+    handler = FileHandler(str(tmp_path))
+    handler.save_summary("video123", "en", "ru", "Russian summary")
+
+    assert handler.get_summary_path("video123", "en", "en") is None
+
+
 def test_load_summary_extracts_body_without_metadata(tmp_path):
     handler = FileHandler(str(tmp_path))
     summary_path = handler.save_summary(
