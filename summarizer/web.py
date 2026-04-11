@@ -1,11 +1,13 @@
 import logging
 import os
+from urllib.parse import urlencode
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from .app import YouTubeSummarizer
 from .config import Config
+from .youtube import YouTubeURLValidator
 
 
 def load_environment():
@@ -21,6 +23,7 @@ app = Flask(__name__)
 
 load_environment()
 config = Config()
+url_validator = YouTubeURLValidator()
 
 # Initialize the summarizer
 summarizer = YouTubeSummarizer(
@@ -31,8 +34,40 @@ summarizer = YouTubeSummarizer(
 )
 
 
-@app.route("/")
-def index():
+def get_requested_video_url(path, query_args):
+    """Return an explicit or reconstructed video URL for the current request."""
+    explicit_video_url = query_args.get("video_url")
+    if explicit_video_url:
+        return explicit_video_url
+
+    normalized_path = f"/{path.lstrip('/')}" if path else "/"
+    filtered_query_items = []
+
+    for key, values in query_args.lists():
+        if key == "video_url":
+            continue
+        for value in values:
+            filtered_query_items.append((key, value))
+
+    candidate_url = f"https://youtube.com{normalized_path}"
+    if filtered_query_items:
+        candidate_url = (
+            f"{candidate_url}?{urlencode(filtered_query_items, doseq=True)}"
+        )
+
+    if url_validator.is_valid_url(candidate_url):
+        return candidate_url
+
+    return None
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def index(path):
+    requested_video_url = get_requested_video_url(path, request.args)
+    if path and requested_video_url:
+        return redirect(url_for("index", video_url=requested_video_url))
+
     return render_template("index.html")
 
 
