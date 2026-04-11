@@ -4,11 +4,8 @@ import re
 from typing import List, Optional
 from urllib.parse import parse_qs, urlparse
 
+from youtube_transcript_api import _errors as transcript_errors
 from youtube_transcript_api._api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import (
-    NoTranscriptFound,
-    TranscriptsDisabled,
-)
 
 from .utils import get_logger
 
@@ -165,8 +162,7 @@ class YouTubeTranscriptExtractor:
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    logger.info(
-                        f"Loaded transcript from cache for video {video_id}")
+                    logger.info(f"Loaded transcript from cache for video {video_id}")
                     return data["transcript"]
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Error reading cache for {video_id}: {str(e)}")
@@ -213,9 +209,7 @@ class YouTubeTranscriptExtractor:
 
             # Try to load from cache first using preferred languages
             for preferred_language in preferred_languages:
-                cached_transcript = self._load_from_cache(
-                    video_id, preferred_language
-                )
+                cached_transcript = self._load_from_cache(video_id, preferred_language)
                 if cached_transcript:
                     return (video_id, preferred_language, cached_transcript)
 
@@ -224,9 +218,7 @@ class YouTubeTranscriptExtractor:
             for i in range(retry_times):
                 try:
                     transcript_list = YouTubeTranscriptApi().list(video_id)
-                    transcript = transcript_list.find_transcript(
-                        preferred_languages
-                    )
+                    transcript = transcript_list.find_transcript(preferred_languages)
                     transcript_data = transcript.fetch()
                     language = transcript.language_code
                     logger.info(
@@ -235,7 +227,7 @@ class YouTubeTranscriptExtractor:
                         video_id,
                     )
                     break
-                except NoTranscriptFound:
+                except transcript_errors.NoTranscriptFound:
                     try:
                         transcript_list = YouTubeTranscriptApi().list(video_id)
                         transcript = next(iter(transcript_list), None)
@@ -283,11 +275,12 @@ class YouTubeTranscriptExtractor:
 
             return (video_id, language, formatted_transcript)
 
-        except TranscriptsDisabled:
-            raise TranscriptsDisabled(
-                f"Transcripts are disabled for video: {video_id}")
-        except NoTranscriptFound:
-            raise NoTranscriptFound(
+        except transcript_errors.TranscriptsDisabled:
+            raise transcript_errors.TranscriptsDisabled(
+                f"Transcripts are disabled for video: {video_id}"
+            )
+        except transcript_errors.NoTranscriptFound:
+            raise transcript_errors.NoTranscriptFound(
                 video_id=video_id,
                 requested_language_codes=preferred_languages,
                 transcript_data=[],
