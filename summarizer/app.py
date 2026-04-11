@@ -1,4 +1,3 @@
-import os
 from typing import Any, Dict, Optional, Union
 
 from .file_handler import FileHandler
@@ -103,15 +102,20 @@ class YouTubeSummarizer:
             logger.info(f"Extracted transcript for video {video_id}")
             requested_summary_language = summary_language or video_lang
 
-            # Try loading summary from cache using the actual transcript language
-            summary_path = self.file_handler.get_summary_path(video_id, video_lang)
+            # Summary cache keys must include transcript and output language so
+            # switching the requested summary language cannot return stale data.
+            summary_path = self.file_handler.get_summary_path(
+                video_id, video_lang, requested_summary_language
+            )
             summary = None
             summary_error = None
+            summary_loaded_from_cache = False
 
-            if summary_path and os.path.exists(summary_path):
+            if summary_path and summary_path.exists():
                 logger.info(f"Found existing summary for video {video_id}")
                 with open(summary_path, "r", encoding="utf-8") as f:
                     summary = f.read()
+                summary_loaded_from_cache = True
 
             # Generate summary if not cached
             if summary is None:
@@ -127,8 +131,14 @@ class YouTubeSummarizer:
                         raise
 
             # Save summary if requested and newly generated
-            if save_to_file and summary and not summary_path:
-                self.file_handler.save_summary(video_id, video_lang, summary, metadata)
+            if save_to_file and summary and not summary_loaded_from_cache:
+                self.file_handler.save_summary(
+                    video_id,
+                    video_lang,
+                    requested_summary_language,
+                    summary,
+                    metadata,
+                )
                 logger.info(f"Saved summary for video {video_id}")
 
             if include_transcript:

@@ -1,8 +1,8 @@
 import os
-import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -58,13 +58,20 @@ class FileHandler:
             raise
 
     def save_summary(
-        self, video_id: str, video_lang: str, summary: str, metadata: Optional[Dict[str, Any]] = None
+        self,
+        video_id: str,
+        transcript_language: str,
+        summary_language: str,
+        summary: str,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Path:
         """
         Save a summary to a file in Markdown format.
 
         Args:
             video_id: YouTube video ID
+            transcript_language: Transcript language used for the video
+            summary_language: Language requested for the summary output
             summary: The summary text
             metadata: Optional metadata to save with the summary
 
@@ -79,11 +86,18 @@ class FileHandler:
         try:
             # Create filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"summary_{video_id}_{video_lang}_{timestamp}.md"
+            filename = (
+                f"summary_{video_id}_{transcript_language}_"
+                f"{summary_language}_{timestamp}.md"
+            )
             file_path = self.output_dir / filename
 
             # Validate path
             self._validate_path(file_path)
+
+            summary_metadata = dict(metadata or {})
+            summary_metadata["transcript_language"] = transcript_language
+            summary_metadata["summary_language"] = summary_language
 
             # Prepare markdown content
             markdown_content = f"""## Summary
@@ -91,9 +105,8 @@ class FileHandler:
 
 ## Metadata
 """
-            if metadata:
-                for key, value in metadata.items():
-                    markdown_content += f"- **{key}**: {value}\n"
+            for key, value in summary_metadata.items():
+                markdown_content += f"- **{key}**: {value}\n"
 
             markdown_content += f"\nGenerated on: {timestamp}"
 
@@ -114,18 +127,27 @@ class FileHandler:
             logger.error(f"Unexpected error when saving summary: {str(e)}")
             raise
 
-    def get_summary_path(self, video_id: str, language: str) -> Optional[Path]:
+    def get_summary_path(
+        self,
+        video_id: str,
+        transcript_language: str,
+        summary_language: str,
+    ) -> Optional[Path]:
         """
         Get the path to the most recent summary for a video.
 
         Args:
             video_id: YouTube video ID
+            transcript_language: Transcript language used for the video
+            summary_language: Requested summary language
 
         Returns:
             Path to the summary file if found, None otherwise
         """
         try:
-            pattern = f"summary_{video_id}_{language}_*.md"
+            pattern = (
+                f"summary_{video_id}_{transcript_language}_{summary_language}_*.md"
+            )
             files = list(self.output_dir.glob(pattern))
             if not files:
                 return None
