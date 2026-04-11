@@ -45,12 +45,12 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 - Modify: `tests/test_gemini.py`
 - Modify: `tests/test_web.py`
 
-- [ ] accept a new `summary_language` field in `/api/summarize`
-- [ ] validate `summary_language` server-side and allow only `en` and `ru`
-- [ ] pass the requested summary language into Gemini prompt generation instead of always using the transcript language
-- [ ] return separate response fields for transcript language and summary language so the UI is not forced to overload the current ambiguous `language` field
-- [ ] write tests for API validation, prompt generation, and the response contract
-- [ ] run `python -m pytest tests/test_gemini.py tests/test_web.py` - must pass before task 3
+- [x] accept a new `summary_language` field in `/api/summarize`
+- [x] validate `summary_language` server-side and allow only `en` and `ru`
+- [x] pass the requested summary language into Gemini prompt generation instead of always using the transcript language
+- [x] return separate response fields for transcript language and summary language so the UI is not forced to overload the current ambiguous `language` field
+- [x] write tests for API validation, prompt generation, and the response contract
+- [x] run `python -m pytest tests/test_gemini.py tests/test_web.py` - passed via `./venv/bin/python -m pytest tests/test_gemini.py tests/test_web.py` because this environment does not provide a `python` alias
 
 ### Task 3: Make summary caching safe for language switching
 

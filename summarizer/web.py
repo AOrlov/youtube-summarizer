@@ -9,6 +9,8 @@ from .app import YouTubeSummarizer
 from .config import Config
 from .youtube import YouTubeURLValidator
 
+ALLOWED_SUMMARY_LANGUAGES = {"en", "ru"}
+
 
 def load_environment():
     """Load environment variables from the specified file."""
@@ -18,6 +20,7 @@ def load_environment():
         logging.info("Loaded environment variables from %s", env_file)
     else:
         logging.warning("No environment file specified or file not found")
+
 
 app = Flask(__name__)
 
@@ -51,9 +54,7 @@ def get_requested_video_url(path, query_args):
 
     candidate_url = f"https://youtube.com{normalized_path}"
     if filtered_query_items:
-        candidate_url = (
-            f"{candidate_url}?{urlencode(filtered_query_items, doseq=True)}"
-        )
+        candidate_url = f"{candidate_url}?{urlencode(filtered_query_items, doseq=True)}"
 
     if url_validator.is_valid_url(candidate_url):
         return candidate_url
@@ -74,25 +75,49 @@ def index(path):
 @app.route("/api/summarize", methods=["POST"])
 def summarize():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         video_url = data.get("video_url")
+        summary_language = data.get("summary_language")
 
         if not video_url:
             return jsonify({"error": "Video URL is required"}), 400
+
+        if (
+            summary_language is not None
+            and summary_language not in ALLOWED_SUMMARY_LANGUAGES
+        ):
+            return (
+                jsonify(
+                    {
+                        "error": "summary_language must be one of: en, ru",
+                        "status": "error",
+                    }
+                ),
+                400,
+            )
 
         result = summarizer.summarize_video(
             video_url=video_url,
             max_tokens=config.max_tokens,
             include_transcript=True,
             allow_summary_failure=True,
+            summary_language=summary_language,
         )
 
         status = "success" if result.get("summary") else "partial_success"
+        transcript_language = result.get("transcript_language") or result.get(
+            "language"
+        )
+        response_summary_language = (
+            result.get("summary_language") or transcript_language
+        )
 
         response_payload = {
             "summary": result.get("summary"),
             "transcript": result.get("transcript"),
-            "language": result.get("language"),
+            "transcript_language": transcript_language,
+            "summary_language": response_summary_language,
+            "language": transcript_language,
             "video_id": result.get("video_id"),
             "summary_error": result.get("summary_error"),
             "status": status,
