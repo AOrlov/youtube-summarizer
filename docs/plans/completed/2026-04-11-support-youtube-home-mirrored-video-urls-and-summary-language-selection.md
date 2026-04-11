@@ -94,8 +94,8 @@ Make the site work when a user opens a YouTube video URL and replaces `.com` wit
 **Files:**
 - Modify: `README.md`
 
-- [ ] document the `youtube.home` mirrored-URL flow with an example URL
-- [ ] document that the summary language dropdown supports only English and Russian
-- [ ] document that the legacy `?video_url=` flow still works for the Firefox extension and local/manual use
-- [ ] move this plan to `docs/plans/completed/`
+- [x] document the `youtube.home` mirrored-URL flow with an example URL
+- [x] document that the summary language dropdown supports only English and Russian
+- [x] document that the legacy `?video_url=` flow still works for the Firefox extension and local/manual use
+- [x] move this plan to `docs/plans/completed/`
 ---
