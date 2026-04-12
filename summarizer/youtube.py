@@ -1,16 +1,15 @@
 import json
+import logging
 import os
 import re
-from typing import List, Optional
+from time import perf_counter
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import parse_qs, urlparse
 
+from youtube_transcript_api import _errors as transcript_errors
 from youtube_transcript_api._api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import (
-    NoTranscriptFound,
-    TranscriptsDisabled,
-)
 
-from .utils import get_logger
+from .utils import get_logger, log_event
 
 logger = get_logger(__name__)
 
@@ -18,18 +17,51 @@ logger = get_logger(__name__)
 class YouTubeURLValidator:
     """Class for validating YouTube URLs and extracting video IDs."""
 
-    # Regular expressions for different YouTube URL formats
-    URL_PATTERNS = [
-        # Standard URL
-        r"(?:https?://)?(?:www\.)?youtube\.com/watch\?v=([^&]+)",
-        r"(?:https?://)?(?:www\.)?youtube\.com/embed/([^/?]+)",  # Embed URL
-        r"(?:https?://)?(?:www\.)?youtu\.be/([^/?]+)",  # Short URL
-        r"(?:https?://)?(?:www\.)?youtube\.com/v/([^/?]+)",  # Old format
-    ]
+    YOUTUBE_DOMAINS = {
+        "youtube.com",
+        "www.youtube.com",
+        "m.youtube.com",
+        "youtube.home",
+        "www.youtube.home",
+        "m.youtube.home",
+    }
+    SHORT_DOMAINS = {"youtu.be", "www.youtu.be"}
+    ALLOWED_SCHEMES = {"http", "https"}
+    SCHEME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
-    def __init__(self):
-        """Initialize the validator with compiled regex patterns."""
-        self.patterns = [re.compile(pattern) for pattern in self.URL_PATTERNS]
+    def _normalize_url(self, url: str) -> Optional[str]:
+        """Normalize partial YouTube URLs so urlparse can inspect them."""
+        if not url:
+            return None
+
+        candidate = url.strip()
+        if not candidate:
+            return None
+
+        if self.SCHEME_PATTERN.match(candidate):
+            parsed = urlparse(candidate)
+            if parsed.scheme.lower() not in self.ALLOWED_SCHEMES:
+                return None
+            return candidate
+
+        bare_domain_prefixes = tuple(self.YOUTUBE_DOMAINS | self.SHORT_DOMAINS)
+        if candidate.startswith(bare_domain_prefixes):
+            return f"https://{candidate}"
+
+        return candidate
+
+    @staticmethod
+    def _extract_path_segment(path: str, prefix: str) -> Optional[str]:
+        normalized_path = path.strip("/")
+        expected_prefix = f"{prefix}/"
+        if not normalized_path.startswith(expected_prefix):
+            return None
+
+        segments = normalized_path.split("/")
+        if len(segments) < 2 or not segments[1]:
+            return None
+
+        return segments[1]
 
     def extract_video_id(self, url: str) -> Optional[str]:
         """
@@ -41,18 +73,28 @@ class YouTubeURLValidator:
         Returns:
             The video ID if found, None otherwise
         """
-        # Try each pattern
-        for pattern in self.patterns:
-            match = pattern.search(url)
-            if match:
-                return match.group(1)
+        normalized_url = self._normalize_url(url)
+        if not normalized_url:
+            return None
 
-        # Try parsing as a standard URL with query parameters
-        parsed = urlparse(url)
-        if parsed.netloc in ["www.youtube.com", "youtube.com"]:
-            query = parse_qs(parsed.query)
-            if "v" in query:
-                return query["v"][0]
+        parsed = urlparse(normalized_url)
+        netloc = parsed.netloc.lower()
+
+        if netloc in self.YOUTUBE_DOMAINS:
+            if parsed.path == "/watch":
+                query = parse_qs(parsed.query)
+                if "v" in query and query["v"]:
+                    return query["v"][0]
+
+            for prefix in ("shorts", "embed", "v"):
+                video_id = self._extract_path_segment(parsed.path, prefix)
+                if video_id:
+                    return video_id
+
+        if netloc in self.SHORT_DOMAINS:
+            segments = [segment for segment in parsed.path.split("/") if segment]
+            if segments:
+                return segments[0]
 
         return None
 
@@ -121,8 +163,7 @@ class YouTubeTranscriptExtractor:
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    logger.info(
-                        f"Loaded transcript from cache for video {video_id}")
+                    logger.info(f"Loaded transcript from cache for video {video_id}")
                     return data["transcript"]
             except (json.JSONDecodeError, KeyError) as e:
                 logger.warning(f"Error reading cache for {video_id}: {str(e)}")
@@ -148,7 +189,27 @@ class YouTubeTranscriptExtractor:
         except Exception as e:
             logger.warning(f"Error saving cache for {video_id}: {str(e)}")
 
-    def get_transcript(self, video_id: str) -> tuple[str, str, str]:
+    def _load_any_cached_transcript(self, video_id: str) -> Optional[tuple[str, str]]:
+        """Load any cached transcript for a video when preferred-language caches miss."""
+        try:
+            for filename in sorted(os.listdir(self.cache_dir)):
+                if not filename.startswith(f"{video_id}_") or not filename.endswith(
+                    ".json"
+                ):
+                    continue
+
+                language = filename[len(video_id) + 1 : -5]
+                cached_transcript = self._load_from_cache(video_id, language)
+                if cached_transcript:
+                    return (language, cached_transcript)
+        except FileNotFoundError:
+            return None
+
+        return None
+
+    def get_transcript(
+        self, video_id: str, include_stats: bool = False
+    ) -> Union[tuple[str, str, str], tuple[str, str, str, Dict[str, Any]]]:
         """
         Get the transcript for a YouTube video.
         Prefer Russian, then English, then fall back to any available transcript.
@@ -164,25 +225,71 @@ class YouTubeTranscriptExtractor:
             NoTranscriptFound: If no transcript is available in the requested language
             Exception: For other errors
         """
+        started_at = perf_counter()
+
+        def build_result(
+            language: str,
+            transcript: str,
+            *,
+            cache_hit: bool,
+            cache_source: str,
+            fetch_attempts: int = 0,
+        ):
+            duration_ms = round((perf_counter() - started_at) * 1000, 3)
+            stats = {
+                "cache_hit": cache_hit,
+                "cache_source": cache_source,
+                "duration_ms": duration_ms,
+                "fetch_attempts": fetch_attempts,
+                "transcript_chars": len(transcript),
+            }
+            log_event(
+                logger,
+                logging.INFO,
+                "transcript_retrieved",
+                video_id=video_id,
+                transcript_language=language,
+                cache_hit=cache_hit,
+                cache_source=cache_source,
+                fetch_attempts=fetch_attempts,
+                duration_ms=duration_ms,
+                transcript_chars=len(transcript),
+            )
+            result = (video_id, language, transcript)
+            if include_stats:
+                return result + (stats,)
+            return result
+
         try:
             preferred_languages = ["ru", "en"]
 
             # Try to load from cache first using preferred languages
             for preferred_language in preferred_languages:
-                cached_transcript = self._load_from_cache(
-                    video_id, preferred_language
-                )
+                cached_transcript = self._load_from_cache(video_id, preferred_language)
                 if cached_transcript:
-                    return (video_id, preferred_language, cached_transcript)
+                    return build_result(
+                        preferred_language,
+                        cached_transcript,
+                        cache_hit=True,
+                        cache_source="preferred_language_cache",
+                    )
+
+            fallback_cached_transcript = self._load_any_cached_transcript(video_id)
+            if fallback_cached_transcript:
+                language, transcript = fallback_cached_transcript
+                return build_result(
+                    language,
+                    transcript,
+                    cache_hit=True,
+                    cache_source="fallback_language_cache",
+                )
 
             # Format the transcript as plain text
             retry_times = 5
             for i in range(retry_times):
                 try:
                     transcript_list = YouTubeTranscriptApi().list(video_id)
-                    transcript = transcript_list.find_transcript(
-                        preferred_languages
-                    )
+                    transcript = transcript_list.find_transcript(preferred_languages)
                     transcript_data = transcript.fetch()
                     language = transcript.language_code
                     logger.info(
@@ -191,7 +298,7 @@ class YouTubeTranscriptExtractor:
                         video_id,
                     )
                     break
-                except NoTranscriptFound:
+                except transcript_errors.NoTranscriptFound:
                     try:
                         transcript_list = YouTubeTranscriptApi().list(video_id)
                         transcript = next(iter(transcript_list), None)
@@ -237,13 +344,20 @@ class YouTubeTranscriptExtractor:
             # Save to cache
             self._save_to_cache(video_id, language, formatted_transcript)
 
-            return (video_id, language, formatted_transcript)
+            return build_result(
+                language,
+                formatted_transcript,
+                cache_hit=False,
+                cache_source="youtube_api",
+                fetch_attempts=i + 1,
+            )
 
-        except TranscriptsDisabled:
-            raise TranscriptsDisabled(
-                f"Transcripts are disabled for video: {video_id}")
-        except NoTranscriptFound:
-            raise NoTranscriptFound(
+        except transcript_errors.TranscriptsDisabled:
+            raise transcript_errors.TranscriptsDisabled(
+                f"Transcripts are disabled for video: {video_id}"
+            )
+        except transcript_errors.NoTranscriptFound:
+            raise transcript_errors.NoTranscriptFound(
                 video_id=video_id,
                 requested_language_codes=preferred_languages,
                 transcript_data=[],
@@ -265,7 +379,7 @@ class YouTubeTranscriptExtractor:
             Exception: If there's an error fetching the languages
         """
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            transcript_list = YouTubeTranscriptApi().list(video_id)
             return [transcript.language_code for transcript in transcript_list]
         except Exception as e:
             raise Exception(f"Error fetching available languages: {str(e)}")

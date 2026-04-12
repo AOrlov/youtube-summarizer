@@ -12,3 +12,10 @@ services:
     restart: unless-stopped
     env_file:
       - stack.env
+    volumes:
+      - summarizer_cache:/app/cache
+      - summarizer_output:/app/output
+
+volumes:
+  summarizer_cache:
+  summarizer_output:
