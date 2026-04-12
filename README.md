@@ -117,10 +117,51 @@ pytest tests/
 
 ### Logging
 
-The application uses Python's built-in logging module with the following configuration:
+The application emits single-line JSON logs to stdout so Loki can parse them reliably.
+
+Common fields:
 - Log level: INFO
-- Format: `%(asctime)s - %(name)s - %(levelname)s - %(message)s`
 - Output: Console (stdout)
+- `event`: Stable event name such as `summary_request_completed`, `summary_request_failed`, `transcript_retrieved`, `api_summarize_response`
+- `video_id`: YouTube video ID when available
+- `summary_language` / `transcript_language`: Output and detected transcript languages
+- `summary_cache_hit` / `transcript_cache_hit`: Cache hit booleans for summary and transcript reuse
+- `summary_generation_ms` / `total_duration_ms`: Model-only latency and end-to-end request latency
+- `status`: `success`, `partial_success`, or `error`
+
+Sample LogQL queries:
+
+```logql
+{service_name="web"} | json | event="summary_request_completed"
+```
+
+```logql
+sum by (summary_language) (
+  count_over_time({service_name="web"} | json | event="summary_request_completed" [24h])
+)
+```
+
+```logql
+sum by (summary_cache_hit) (
+  count_over_time({service_name="web"} | json | event="summary_request_completed" [24h])
+)
+```
+
+```logql
+quantile_over_time(
+  0.95,
+  {service_name="web"} | json | event="summary_request_completed" | unwrap total_duration_ms [24h]
+)
+```
+
+```logql
+topk(
+  10,
+  sum by (video_id) (
+    count_over_time({service_name="web"} | json | event="summary_request_completed" [24h])
+  )
+)
+```
 
 ## Requirements
 

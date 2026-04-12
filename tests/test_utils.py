@@ -1,7 +1,8 @@
+import json
 import logging
 import tempfile
 
-from summarizer.utils import get_logger, setup_logging
+from summarizer.utils import get_logger, log_event, setup_logging
 
 
 def test_setup_logging_console():
@@ -64,6 +65,33 @@ def test_logger_inheritance():
     child_logger = get_logger("summarizer.child")
 
     assert parent_logger.level == logging.DEBUG
+    assert parent_logger.propagate is False
     assert child_logger.level == logging.NOTSET
     assert child_logger.getEffectiveLevel() == logging.DEBUG
     assert len(child_logger.handlers) == 0
+
+
+def test_log_event_writes_json_with_extra_fields():
+    with tempfile.NamedTemporaryFile() as temp_file:
+        logger = setup_logging(
+            log_level="INFO", log_file=temp_file.name, console_output=False
+        )
+
+        log_event(
+            logger,
+            logging.INFO,
+            "summary_request_completed",
+            video_id="video123",
+            summary_language="ru",
+            total_duration_ms=12.5,
+        )
+
+        with open(temp_file.name, "r", encoding="utf-8") as f:
+            payload = json.loads(f.read().strip())
+
+        assert payload["event"] == "summary_request_completed"
+        assert payload["video_id"] == "video123"
+        assert payload["summary_language"] == "ru"
+        assert payload["total_duration_ms"] == 12.5
+        assert payload["level"] == "info"
+        assert payload["logger"] == "summarizer"

@@ -17,9 +17,20 @@ class FakeTranscriptExtractor:
         self.api_key = api_key
         self.calls = []
 
-    def get_transcript(self, video_id):
+    def get_transcript(self, video_id, include_stats=False):
         self.calls.append(video_id)
-        return ("video123", "en", "Transcript text")
+        result = ("video123", "en", "Transcript text")
+        if include_stats:
+            return result + (
+                {
+                    "cache_hit": True,
+                    "cache_source": "preferred_language_cache",
+                    "duration_ms": 1.0,
+                    "fetch_attempts": 0,
+                    "transcript_chars": len("Transcript text"),
+                },
+            )
+        return result
 
 
 class FakeGeminiSummarizer:

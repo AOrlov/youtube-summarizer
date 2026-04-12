@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from urllib.parse import urlencode
 
 import flask
@@ -7,6 +8,7 @@ from dotenv import load_dotenv
 
 from .app import YouTubeSummarizer
 from .config import Config
+from .utils import get_logger, log_event
 from .youtube import YouTubeURLValidator
 
 ALLOWED_SUMMARY_LANGUAGES = {"en", "ru"}
@@ -21,15 +23,17 @@ MIRRORED_YOUTUBE_HOSTS = {
     "m.youtube.home",
 }
 
+logger = get_logger(__name__)
+
 
 def load_environment():
     """Load environment variables from the specified file."""
     env_file = os.getenv("ENV_FILE")
     if env_file and os.path.exists(env_file):
         load_dotenv(env_file)
-        logging.info("Loaded environment variables from %s", env_file)
+        log_event(logger, logging.INFO, "environment_loaded", env_file=env_file)
     else:
-        logging.warning("No environment file specified or file not found")
+        log_event(logger, logging.WARNING, "environment_missing", env_file=env_file)
 
 
 app = flask.Flask(__name__)
@@ -45,6 +49,11 @@ summarizer = YouTubeSummarizer(
     youtube_api_key=config.youtube_api_key,
     output_dir=config.output_dir,
 )
+
+
+@app.before_request
+def start_request_timer():
+    flask.g.request_started_at = time.perf_counter()
 
 
 def is_mirrored_youtube_host(host):
@@ -111,6 +120,16 @@ def index(path):
         if not mirrored_host:
             flask.abort(404)
         if reconstructed_video_url:
+            log_event(
+                logger,
+                logging.INFO,
+                "mirrored_request_redirect",
+                host=flask.request.host,
+                path=flask.request.path,
+                video_id=url_validator.extract_video_id(requested_video_url),
+                summary_language=requested_summary_language,
+                explicit_video_url=bool(explicit_video_url),
+            )
             return flask.redirect(
                 flask.url_for(
                     "index",
@@ -133,14 +152,33 @@ def summarize():
         data = flask.request.get_json(silent=True) or {}
         video_url = data.get("video_url")
         summary_language = data.get("summary_language")
+        video_id = url_validator.extract_video_id(video_url) if video_url else None
 
         if not video_url:
+            log_event(
+                logger,
+                logging.WARNING,
+                "api_summarize_invalid_request",
+                reason="missing_video_url",
+                host=flask.request.host,
+                path=flask.request.path,
+            )
             return flask.jsonify({"error": "Video URL is required"}), 400
 
         if (
             summary_language is not None
             and summary_language not in ALLOWED_SUMMARY_LANGUAGES
         ):
+            log_event(
+                logger,
+                logging.WARNING,
+                "api_summarize_invalid_request",
+                reason="invalid_summary_language",
+                host=flask.request.host,
+                path=flask.request.path,
+                video_id=video_id,
+                summary_language=summary_language,
+            )
             return (
                 flask.jsonify(
                     {
@@ -178,10 +216,44 @@ def summarize():
             "status": status,
         }
 
+        request_duration_ms = round(
+            (time.perf_counter() - flask.g.request_started_at) * 1000, 3
+        )
+        log_event(
+            logger,
+            logging.INFO,
+            "api_summarize_response",
+            host=flask.request.host,
+            path=flask.request.path,
+            video_id=response_payload["video_id"],
+            transcript_language=response_payload["transcript_language"],
+            summary_language=response_payload["summary_language"],
+            status=response_payload["status"],
+            status_code=200,
+            summary_available=bool(response_payload["summary"]),
+            transcript_available=bool(response_payload["transcript"]),
+            request_duration_ms=request_duration_ms,
+        )
+
         return flask.jsonify(response_payload)
 
     except Exception as e:
         status_code = 400 if isinstance(e, ValueError) else 500
+        request_duration_ms = round(
+            (time.perf_counter() - flask.g.request_started_at) * 1000, 3
+        )
+        log_event(
+            logger,
+            logging.ERROR,
+            "api_summarize_response",
+            host=flask.request.host,
+            path=flask.request.path,
+            status="error",
+            status_code=status_code,
+            error=str(e),
+            error_type=type(e).__name__,
+            request_duration_ms=request_duration_ms,
+        )
         return flask.jsonify({"error": str(e), "status": "error"}), status_code
 
 
