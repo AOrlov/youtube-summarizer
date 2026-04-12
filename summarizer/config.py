@@ -50,6 +50,11 @@ class Config:
         return os.getenv("OUTPUT_DIR", "output")
 
     @property
+    def transcript_cache_dir(self) -> str:
+        """Get the transcript cache directory, defaulting to "cache/transcripts"."""
+        return os.getenv("TRANSCRIPT_CACHE_DIR", "cache/transcripts")
+
+    @property
     def max_tokens(self) -> Optional[int]:
         """Get the maximum number of tokens, defaulting to None."""
         return int(os.getenv("MAX_TOKENS") or 1024)

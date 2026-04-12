@@ -47,9 +47,24 @@ def test_default_values(monkeypatch):
     _set_required_env(monkeypatch)
     monkeypatch.delenv("LANGUAGE", raising=False)
     monkeypatch.delenv("LOG_LEVEL", raising=False)
+    monkeypatch.delenv("OUTPUT_DIR", raising=False)
+    monkeypatch.delenv("TRANSCRIPT_CACHE_DIR", raising=False)
 
     config = Config()
 
     assert config.youtube_api_key == "youtube_key"
     assert config.language == "en"
     assert config.log_level == "INFO"
+    assert config.output_dir == "output"
+    assert config.transcript_cache_dir == "cache/transcripts"
+
+
+def test_directory_overrides(monkeypatch):
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv("OUTPUT_DIR", "/tmp/output")
+    monkeypatch.setenv("TRANSCRIPT_CACHE_DIR", "/tmp/cache/transcripts")
+
+    config = Config()
+
+    assert config.output_dir == "/tmp/output"
+    assert config.transcript_cache_dir == "/tmp/cache/transcripts"

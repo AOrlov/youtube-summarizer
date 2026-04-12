@@ -9,6 +9,7 @@ import summarizer.app as app_module
 
 class FakeYouTubeSummarizer:
     def __init__(self, *args, **kwargs):
+        self.init_kwargs = kwargs
         self.calls = []
         self.next_result = {
             "summary": "summary",
@@ -33,6 +34,7 @@ def web_module(monkeypatch, tmp_path):
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setenv("YOUTUBE_API_KEY", "test-youtube-key")
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "output"))
+    monkeypatch.setenv("TRANSCRIPT_CACHE_DIR", str(tmp_path / "cache" / "transcripts"))
     monkeypatch.setattr(app_module, "YouTubeSummarizer", FakeYouTubeSummarizer)
 
     sys.modules.pop("summarizer.web", None)
@@ -46,16 +48,26 @@ def client(web_module):
     return web_module.app.test_client()
 
 
+def test_web_initializes_summarizer_with_configured_directories(web_module, tmp_path):
+    assert web_module.summarizer.init_kwargs["output_dir"] == str(tmp_path / "output")
+    assert web_module.summarizer.init_kwargs["transcript_cache_dir"] == str(
+        tmp_path / "cache" / "transcripts"
+    )
+
+
 def test_index_renders_summary_language_dropdown_with_explicit_labels(client):
     response = client.get("/")
 
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
+    assert 'class="intake-grid"' in html
     assert 'id="summaryLanguage"' in html
+    assert "form-select form-select-sm" in html
+    assert 'aria-label="Summary language"' in html
     assert '<option value="ru" selected>Russian</option>' in html
     assert '<option value="en">English</option>' in html
-    assert "Summary language" in html
+    assert "Output" in html
     assert "Transcript language" in html
     assert "summary_language: summaryLanguageSelect.value" in html
     assert "marked.parse" in html

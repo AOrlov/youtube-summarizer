@@ -21,6 +21,7 @@ class YouTubeSummarizer:
         model_name: str,
         output_dir: str,
         youtube_api_key: str,
+        transcript_cache_dir: str = "cache/transcripts",
     ):
         """
         Initialize the summarizer.
@@ -30,9 +31,13 @@ class YouTubeSummarizer:
             language: The language code for the transcript
             output_dir: Directory to save summaries
             model_name: The name of the Gemini model to use
+            transcript_cache_dir: Directory to cache fetched transcripts
         """
         self.url_validator = YouTubeURLValidator()
-        self.transcript_extractor = YouTubeTranscriptExtractor(api_key=youtube_api_key)
+        self.transcript_extractor = YouTubeTranscriptExtractor(
+            api_key=youtube_api_key,
+            cache_dir=transcript_cache_dir,
+        )
         self.summarizer = GeminiSummarizer(gemini_api_key, model_name)
         self.file_handler = FileHandler(output_dir)
 
