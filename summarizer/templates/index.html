@@ -78,7 +78,7 @@
                 min-width: 0;
             }
 
-            .language-control .form-select-sm,
+            .language-control .form-select,
             .intake-grid .btn {
                 width: 100%;
             }
@@ -91,7 +91,7 @@
         <h1 class="text-center mb-4">YouTube Video Summarizer</h1>
 
         <div class="row justify-content-center">
-            <div class="col-md-10 col-lg-8">
+            <div class="col-md-11 col-lg-10 col-xl-9">
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <form id="summarizeForm">
@@ -102,7 +102,7 @@
                                 </div>
                                 <div class="language-control">
                                     <label for="summaryLanguage" class="intake-label">Output</label>
-                                    <select class="form-select form-select-sm" id="summaryLanguage" aria-label="Summary language">
+                                    <select class="form-select" id="summaryLanguage" aria-label="Summary language">
                                         {% for value, label in summary_language_options %}
                                         <option value="{{ value }}"{% if value == default_summary_language %} selected{% endif %}>{{ label }}</option>
                                         {% endfor %}
