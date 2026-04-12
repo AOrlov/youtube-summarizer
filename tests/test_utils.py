@@ -1,8 +1,8 @@
-import json
 import logging
 import tempfile
+import json
 
-from summarizer.utils import get_logger, log_event, setup_logging
+from summarizer.utils import JsonFormatter, get_logger, log_event, setup_logging
 
 
 def test_setup_logging_console():
@@ -95,3 +95,13 @@ def test_log_event_writes_json_with_extra_fields():
         assert payload["total_duration_ms"] == 12.5
         assert payload["level"] == "info"
         assert payload["logger"] == "summarizer"
+
+
+def test_json_formatter_omits_python_task_name():
+    record = logging.makeLogRecord(
+        {"name": "summarizer.test", "msg": "hello", "levelname": "INFO", "levelno": 20}
+    )
+
+    payload = json.loads(JsonFormatter().format(record))
+
+    assert "taskName" not in payload
