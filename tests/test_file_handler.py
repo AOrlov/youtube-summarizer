@@ -13,8 +13,9 @@ class FakeURLValidator:
 
 
 class FakeTranscriptExtractor:
-    def __init__(self, api_key):
+    def __init__(self, api_key, cache_dir):
         self.api_key = api_key
+        self.cache_dir = cache_dir
         self.calls = []
 
     def get_transcript(self, video_id, include_stats=False):
@@ -148,7 +149,10 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
     monkeypatch, tmp_path
 ):
     fake_url_validator = FakeURLValidator()
-    fake_transcript_extractor = FakeTranscriptExtractor(api_key="youtube-key")
+    fake_transcript_extractor = FakeTranscriptExtractor(
+        api_key="youtube-key",
+        cache_dir=str(tmp_path / "transcripts"),
+    )
     fake_gemini_summarizer = FakeGeminiSummarizer(
         api_key="gemini-key",
         model_name="gemini-model",
@@ -162,7 +166,7 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
     monkeypatch.setattr(
         app_module,
         "YouTubeTranscriptExtractor",
-        lambda api_key: fake_transcript_extractor,
+        lambda api_key, cache_dir: fake_transcript_extractor,
     )
     monkeypatch.setattr(
         app_module,
@@ -175,6 +179,7 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
         model_name="gemini-model",
         output_dir=str(tmp_path),
         youtube_api_key="youtube-key",
+        transcript_cache_dir=str(tmp_path / "transcripts"),
     )
     video_url = "https://youtube.com/watch?v=dQw4w9WgXcQ"
 
@@ -213,3 +218,4 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
         next(tmp_path.glob("summary_video123_en_en_*.md")).name,
         next(tmp_path.glob("summary_video123_en_ru_*.md")).name,
     ]
+    assert fake_transcript_extractor.cache_dir == str(tmp_path / "transcripts")

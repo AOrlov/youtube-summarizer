@@ -60,6 +60,8 @@ docker-compose --env-file .env up --build
 
 3. Access the web interface at http://localhost:5100.
 
+Docker Compose now persists both transcript cache and saved summaries in named volumes mounted at `/app/cache` and `/app/output`, so cache hits survive container recreation.
+
 The web interface provides a simple form where you can:
 - Enter a YouTube video URL
 - Choose the summary output language from Russian or English, with Russian selected by default in the web UI
@@ -91,6 +93,7 @@ summarizer = YouTubeSummarizer(
     model_name="gemini-2.0-flash",
     output_dir="output",
     youtube_api_key="your-youtube-api-key",
+    transcript_cache_dir="cache/transcripts",
 )
 
 # Generate a summary in a specific output language
@@ -130,6 +133,7 @@ Current notes:
 - The project now targets Python 3.14.4 locally and in Docker.
 - `requests` was removed from the direct requirements because it is not imported by the application code.
 - `gunicorn` is now pinned in `requirements.txt` so the production server is included in audits.
+- `TRANSCRIPT_CACHE_DIR` controls where fetched transcripts are cached; `OUTPUT_DIR` continues to control saved summaries and summary cache reuse.
 - Runtime and dev dependencies are pinned to current releases that support Python 3.14.
 - Re-run the audit after dependency changes instead of assuming a previously captured report is still current.
 

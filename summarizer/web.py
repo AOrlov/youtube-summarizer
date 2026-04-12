@@ -48,6 +48,7 @@ summarizer = YouTubeSummarizer(
     model_name=config.gemini_model,
     youtube_api_key=config.youtube_api_key,
     output_dir=config.output_dir,
+    transcript_cache_dir=config.transcript_cache_dir,
 )
 
 

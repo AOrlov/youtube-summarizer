@@ -43,6 +43,46 @@
         .results-card:hover {
             box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
         }
+
+        .intake-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 0.85rem;
+            align-items: end;
+        }
+
+        .intake-label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6c757d;
+            margin-bottom: 0.4rem;
+        }
+
+        .language-control {
+            min-width: 8.5rem;
+        }
+
+        .helper-copy {
+            padding-left: 0.1rem;
+        }
+
+        @media (max-width: 767.98px) {
+            .intake-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .language-control {
+                min-width: 0;
+            }
+
+            .language-control .form-select-sm,
+            .intake-grid .btn {
+                width: 100%;
+            }
+        }
     </style>
 </head>
 
@@ -55,20 +95,24 @@
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <form id="summarizeForm">
-                            <div class="mb-3">
-                                <label for="videoUrl" class="form-label">YouTube Video URL</label>
-                                <input type="url" class="form-control" id="videoUrl" required>
+                            <div class="intake-grid">
+                                <div>
+                                    <label for="videoUrl" class="form-label">YouTube Video URL</label>
+                                    <input type="url" class="form-control" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." required>
+                                </div>
+                                <div class="language-control">
+                                    <label for="summaryLanguage" class="intake-label">Output</label>
+                                    <select class="form-select form-select-sm" id="summaryLanguage" aria-label="Summary language">
+                                        {% for value, label in summary_language_options %}
+                                        <option value="{{ value }}"{% if value == default_summary_language %} selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">Summarize</button>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="summaryLanguage" class="form-label">Summary language</label>
-                                <select class="form-select" id="summaryLanguage">
-                                    {% for value, label in summary_language_options %}
-                                    <option value="{{ value }}"{% if value == default_summary_language %} selected{% endif %}>{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <button type="submit" class="btn btn-primary">Summarize</button>
+                            <div class="helper-copy mt-2">
                                 <small class="text-muted">You will always get the full transcript for copying.</small>
                             </div>
                         </form>
