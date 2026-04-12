@@ -1,13 +1,15 @@
 import json
+import logging
 import os
 import re
-from typing import List, Optional
+from time import perf_counter
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import parse_qs, urlparse
 
 from youtube_transcript_api import _errors as transcript_errors
 from youtube_transcript_api._api import YouTubeTranscriptApi
 
-from .utils import get_logger
+from .utils import get_logger, log_event
 
 logger = get_logger(__name__)
 
@@ -205,7 +207,9 @@ class YouTubeTranscriptExtractor:
 
         return None
 
-    def get_transcript(self, video_id: str) -> tuple[str, str, str]:
+    def get_transcript(
+        self, video_id: str, include_stats: bool = False
+    ) -> Union[tuple[str, str, str], tuple[str, str, str, Dict[str, Any]]]:
         """
         Get the transcript for a YouTube video.
         Prefer Russian, then English, then fall back to any available transcript.
@@ -221,6 +225,41 @@ class YouTubeTranscriptExtractor:
             NoTranscriptFound: If no transcript is available in the requested language
             Exception: For other errors
         """
+        started_at = perf_counter()
+
+        def build_result(
+            language: str,
+            transcript: str,
+            *,
+            cache_hit: bool,
+            cache_source: str,
+            fetch_attempts: int = 0,
+        ):
+            duration_ms = round((perf_counter() - started_at) * 1000, 3)
+            stats = {
+                "cache_hit": cache_hit,
+                "cache_source": cache_source,
+                "duration_ms": duration_ms,
+                "fetch_attempts": fetch_attempts,
+                "transcript_chars": len(transcript),
+            }
+            log_event(
+                logger,
+                logging.INFO,
+                "transcript_retrieved",
+                video_id=video_id,
+                transcript_language=language,
+                cache_hit=cache_hit,
+                cache_source=cache_source,
+                fetch_attempts=fetch_attempts,
+                duration_ms=duration_ms,
+                transcript_chars=len(transcript),
+            )
+            result = (video_id, language, transcript)
+            if include_stats:
+                return result + (stats,)
+            return result
+
         try:
             preferred_languages = ["ru", "en"]
 
@@ -228,12 +267,22 @@ class YouTubeTranscriptExtractor:
             for preferred_language in preferred_languages:
                 cached_transcript = self._load_from_cache(video_id, preferred_language)
                 if cached_transcript:
-                    return (video_id, preferred_language, cached_transcript)
+                    return build_result(
+                        preferred_language,
+                        cached_transcript,
+                        cache_hit=True,
+                        cache_source="preferred_language_cache",
+                    )
 
             fallback_cached_transcript = self._load_any_cached_transcript(video_id)
             if fallback_cached_transcript:
                 language, transcript = fallback_cached_transcript
-                return (video_id, language, transcript)
+                return build_result(
+                    language,
+                    transcript,
+                    cache_hit=True,
+                    cache_source="fallback_language_cache",
+                )
 
             # Format the transcript as plain text
             retry_times = 5
@@ -295,7 +344,13 @@ class YouTubeTranscriptExtractor:
             # Save to cache
             self._save_to_cache(video_id, language, formatted_transcript)
 
-            return (video_id, language, formatted_transcript)
+            return build_result(
+                language,
+                formatted_transcript,
+                cache_hit=False,
+                cache_source="youtube_api",
+                fetch_attempts=i + 1,
+            )
 
         except transcript_errors.TranscriptsDisabled:
             raise transcript_errors.TranscriptsDisabled(

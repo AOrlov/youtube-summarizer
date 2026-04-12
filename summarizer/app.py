@@ -1,8 +1,10 @@
+import logging
+from time import perf_counter
 from typing import Any, Dict, Optional, Union
 
 from .file_handler import FileHandler
 from .gemini import GeminiSummarizer
-from .utils import get_logger
+from .utils import get_logger, log_event
 from .youtube import YouTubeTranscriptExtractor, YouTubeURLValidator
 
 logger = get_logger(__name__)
@@ -84,21 +86,47 @@ class YouTubeSummarizer:
             ValueError: If the video URL is invalid
             Exception: If there's an error during transcript extraction or summarization
         """
+        request_started_at = perf_counter()
+        video_id = None
+        requested_summary_language = summary_language
+        transcript_stats = {
+            "cache_hit": None,
+            "cache_source": None,
+            "duration_ms": None,
+            "fetch_attempts": None,
+            "transcript_chars": None,
+        }
+        summary_generation_ms = None
+        summary_loaded_from_cache = False
+
         try:
             # Validate inputs
             self._validate_inputs(video_url, max_tokens, summary_language)
-
-            logger.info(f"Processing video: {video_url}")
 
             # Extract video ID
             video_id = self.url_validator.extract_video_id(video_url)
             if not video_id:
                 raise ValueError("Invalid YouTube URL")
 
-            # Extract transcript
-            video_id, video_lang, transcript = self.transcript_extractor.get_transcript(
-                video_id
+            log_event(
+                logger,
+                logging.INFO,
+                "summary_request_started",
+                video_id=video_id,
+                requested_summary_language=summary_language,
+                include_transcript=include_transcript,
+                allow_summary_failure=allow_summary_failure,
+                save_to_file=save_to_file,
+                max_tokens=max_tokens,
             )
+
+            # Extract transcript
+            (
+                video_id,
+                video_lang,
+                transcript,
+                transcript_stats,
+            ) = self.transcript_extractor.get_transcript(video_id, include_stats=True)
             logger.info(f"Extracted transcript for video {video_id}")
             requested_summary_language = summary_language or video_lang
 
@@ -109,7 +137,6 @@ class YouTubeSummarizer:
             )
             summary = None
             summary_error = None
-            summary_loaded_from_cache = False
 
             if summary_path and summary_path.exists():
                 logger.info(f"Found existing summary for video {video_id}")
@@ -119,11 +146,18 @@ class YouTubeSummarizer:
             # Generate summary if not cached
             if summary is None:
                 try:
+                    generation_started_at = perf_counter()
                     summary = self.summarizer.summarize(
                         transcript, requested_summary_language, max_tokens
                     )
+                    summary_generation_ms = round(
+                        (perf_counter() - generation_started_at) * 1000, 3
+                    )
                     logger.info(f"Generated summary for video {video_id}")
                 except Exception as e:
+                    summary_generation_ms = round(
+                        (perf_counter() - generation_started_at) * 1000, 3
+                    )
                     summary_error = str(e)
                     logger.error(f"Error during summarization: {summary_error}")
                     if not (include_transcript and allow_summary_failure):
@@ -139,6 +173,31 @@ class YouTubeSummarizer:
                     metadata,
                 )
                 logger.info(f"Saved summary for video {video_id}")
+
+            total_ms = round((perf_counter() - request_started_at) * 1000, 3)
+            status = "success" if summary else "partial_success"
+            log_event(
+                logger,
+                logging.INFO,
+                "summary_request_completed",
+                video_id=video_id,
+                transcript_language=video_lang,
+                summary_language=requested_summary_language,
+                transcript_cache_hit=transcript_stats["cache_hit"],
+                transcript_cache_source=transcript_stats["cache_source"],
+                transcript_fetch_attempts=transcript_stats["fetch_attempts"],
+                transcript_duration_ms=transcript_stats["duration_ms"],
+                transcript_chars=transcript_stats["transcript_chars"],
+                summary_cache_hit=summary_loaded_from_cache,
+                summary_generation_ms=summary_generation_ms,
+                summary_chars=len(summary) if summary else 0,
+                summary_saved=bool(
+                    save_to_file and summary and not summary_loaded_from_cache
+                ),
+                summary_error=summary_error,
+                status=status,
+                total_duration_ms=total_ms,
+            )
 
             if include_transcript:
                 return {
@@ -156,6 +215,17 @@ class YouTubeSummarizer:
             return summary
 
         except Exception as e:
+            total_ms = round((perf_counter() - request_started_at) * 1000, 3)
+            log_event(
+                logger,
+                logging.ERROR,
+                "summary_request_failed",
+                video_id=video_id,
+                requested_summary_language=requested_summary_language,
+                error=str(e),
+                error_type=type(e).__name__,
+                total_duration_ms=total_ms,
+            )
             logger.error(f"Error summarizing video: {str(e)}")
             raise
 
