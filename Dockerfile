@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.6
-FROM python:3.13-slim AS wheels
+FROM python:3.14.4-slim AS wheels
 
 WORKDIR /wheels
 
 COPY requirements.txt .
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --prefer-binary -r requirements.txt gunicorn
+    pip wheel --prefer-binary -r requirements.txt
 
-FROM python:3.13-slim
+FROM python:3.14.4-slim
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY --from=wheels /wheels /wheels
 COPY requirements.txt .
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1
-RUN pip install --no-compile --no-index --find-links=/wheels -r requirements.txt gunicorn \
+RUN pip install --no-compile --no-index --find-links=/wheels -r requirements.txt \
     && rm -rf /wheels
 
 # Copy the rest of the application

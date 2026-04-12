@@ -22,17 +22,19 @@ cd Summarizer
 
 2. Create and activate a virtual environment:
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
+Use Python 3.14.4 locally if possible. The Docker image runs on Python 3.14.4, and keeping local development on the same version avoids dependency-resolution drift.
+
 3. Install dependencies:
 ```bash
-pip install -r requirements.txt
+./venv/bin/pip install -r requirements.txt
 ```
 For development tools:
 ```bash
-pip install -r requirements-dev.txt
+./venv/bin/pip install -r requirements-dev.txt
 ```
 
 4. Set up your Gemini API key:
@@ -112,8 +114,24 @@ print(result["transcript_language"], result["summary_language"])
 ### Running Tests
 
 ```bash
-pytest tests/
+./venv/bin/python -m pytest tests/
 ```
+
+### Dependency Auditing
+
+Run the dependency audit against the pinned requirements files:
+
+```bash
+./venv/bin/python -m pip_audit -r requirements.txt -r requirements-dev.txt --desc
+./venv/bin/python -m pip check
+```
+
+Current notes:
+- The project now targets Python 3.14.4 locally and in Docker.
+- `requests` was removed from the direct requirements because it is not imported by the application code.
+- `gunicorn` is now pinned in `requirements.txt` so the production server is included in audits.
+- Runtime and dev dependencies are pinned to current releases that support Python 3.14.
+- Re-run the audit after dependency changes instead of assuming a previously captured report is still current.
 
 ### Logging
 
@@ -165,10 +183,11 @@ topk(
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.14.4 for local development and Docker parity
 - google-genai
 - youtube-transcript-api
 - Flask (for web interface)
+- Gunicorn (for the production WSGI server)
 - pytest/black/isort (for development)
 
 ## License
