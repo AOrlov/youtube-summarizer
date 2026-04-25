@@ -9,6 +9,10 @@ from .utils import get_logger
 logger = get_logger(__name__)
 
 SUMMARY_BODY_LENGTH_MARKER = "<!--SUMMARY_BODY_LENGTH:{length}-->\n"
+SUMMARY_BODY_LENGTH_RE = re.compile(r"\A<!--SUMMARY_BODY_LENGTH:(\d+)-->\n")
+SUMMARY_PREFIX = "## Summary\n"
+METADATA_MARKER = "\n\n## Metadata\n"
+METADATA_LINE_RE = re.compile(r"^- \*\*(?P<key>[^*]+)\*\*: (?P<value>.*)$")
 
 
 class FileHandler:
@@ -130,6 +134,63 @@ class FileHandler:
             logger.error(f"Unexpected error when saving summary: {str(e)}")
             raise
 
+    def _parse_metadata(self, metadata_text: str) -> Dict[str, str]:
+        """Parse saved markdown metadata lines into a flat dictionary."""
+        metadata = {}
+        for line in metadata_text.splitlines():
+            match = METADATA_LINE_RE.match(line)
+            if match:
+                metadata[match.group("key")] = match.group("value")
+
+        return metadata
+
+    def load_summary_record(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """
+        Load the summary body and metadata from a saved summary artifact.
+
+        Args:
+            file_path: Path to the saved summary file
+
+        Returns:
+            A dictionary with summary and metadata, or None if the file cannot be read
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            summary_length = None
+            summary_length_match = SUMMARY_BODY_LENGTH_RE.match(content)
+            if summary_length_match:
+                summary_length = int(summary_length_match.group(1))
+                content = content[summary_length_match.end() :]
+
+            if not content.startswith(SUMMARY_PREFIX):
+                return {"summary": content, "metadata": {}}
+
+            summary_body = content[len(SUMMARY_PREFIX) :]
+            metadata_text = ""
+            if summary_length is not None:
+                summary = summary_body[:summary_length]
+                metadata_text = summary_body[summary_length:]
+                if metadata_text.startswith(METADATA_MARKER):
+                    metadata_text = metadata_text[len(METADATA_MARKER) :]
+                return {
+                    "summary": summary,
+                    "metadata": self._parse_metadata(metadata_text),
+                }
+
+            if METADATA_MARKER in summary_body:
+                summary_body, metadata_text = summary_body.split(METADATA_MARKER, 1)
+
+            return {
+                "summary": summary_body.rstrip(),
+                "metadata": self._parse_metadata(metadata_text),
+            }
+
+        except Exception as e:
+            logger.warning(f"Failed to load summary from {file_path}: {str(e)}")
+            return None
+
     def load_summary(self, file_path: Path) -> Optional[str]:
         """
         Load the summary body from a saved summary artifact.
@@ -140,36 +201,11 @@ class FileHandler:
         Returns:
             The extracted summary body, or None if the file cannot be read
         """
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            summary_length = None
-            summary_length_match = re.match(
-                r"\A<!--SUMMARY_BODY_LENGTH:(\d+)-->\n", content
-            )
-            if summary_length_match:
-                summary_length = int(summary_length_match.group(1))
-                content = content[summary_length_match.end() :]
-
-            summary_prefix = "## Summary\n"
-            metadata_marker = "\n\n## Metadata\n"
-
-            if not content.startswith(summary_prefix):
-                return content
-
-            summary_body = content[len(summary_prefix) :]
-            if summary_length is not None:
-                return summary_body[:summary_length]
-
-            if metadata_marker in summary_body:
-                summary_body = summary_body.split(metadata_marker, 1)[0]
-
-            return summary_body.rstrip()
-
-        except Exception as e:
-            logger.warning(f"Failed to load summary from {file_path}: {str(e)}")
+        summary_record = self.load_summary_record(file_path)
+        if summary_record is None:
             return None
+
+        return summary_record["summary"]
 
     @staticmethod
     def _is_legacy_summary_name(

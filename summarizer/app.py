@@ -40,6 +40,7 @@ class YouTubeSummarizer:
         )
         self.summarizer = GeminiSummarizer(gemini_api_key, model_name)
         self.file_handler = FileHandler(output_dir)
+        self.model_name = model_name
 
         logger.info(f"Initialized YouTubeSummarizer with model: {model_name}")
 
@@ -71,6 +72,7 @@ class YouTubeSummarizer:
         include_transcript: bool = False,
         allow_summary_failure: bool = False,
         summary_language: Optional[str] = None,
+        force_regenerate: bool = False,
     ) -> Union[str, Dict[str, Any]]:
         """
         Extract transcript and generate summary for a YouTube video.
@@ -83,6 +85,7 @@ class YouTubeSummarizer:
             include_transcript: Whether to return the transcript along with the summary
             allow_summary_failure: If True, return transcript even when summary generation fails
             summary_language: Optional summary output language code
+            force_regenerate: If True, skip cached summaries and generate a new one
 
         Returns:
             The generated summary or a dictionary containing both summary and transcript when requested
@@ -103,6 +106,8 @@ class YouTubeSummarizer:
         }
         summary_generation_ms = None
         summary_loaded_from_cache = False
+        summary_model_name = None
+        summary_model_status = "unavailable"
 
         try:
             # Validate inputs
@@ -123,6 +128,8 @@ class YouTubeSummarizer:
                 allow_summary_failure=allow_summary_failure,
                 save_to_file=save_to_file,
                 max_tokens=max_tokens,
+                current_model_name=self.model_name,
+                force_regenerate=force_regenerate,
             )
 
             # Extract transcript
@@ -137,16 +144,21 @@ class YouTubeSummarizer:
 
             # Summary cache keys must include transcript and output language so
             # switching the requested summary language cannot return stale data.
-            summary_path = self.file_handler.get_summary_path(
-                video_id, video_lang, requested_summary_language
-            )
+            summary_path = None
+            if not force_regenerate:
+                summary_path = self.file_handler.get_summary_path(
+                    video_id, video_lang, requested_summary_language
+                )
             summary = None
             summary_error = None
 
             if summary_path and summary_path.exists():
                 logger.info(f"Found existing summary for video {video_id}")
-                summary = self.file_handler.load_summary(summary_path)
-                summary_loaded_from_cache = summary is not None
+                summary_record = self.file_handler.load_summary_record(summary_path)
+                if summary_record is not None:
+                    summary = summary_record["summary"]
+                    summary_model_name = summary_record["metadata"].get("model_name")
+                    summary_loaded_from_cache = summary is not None
 
             # Generate summary if not cached
             if summary is None:
@@ -158,6 +170,7 @@ class YouTubeSummarizer:
                     summary_generation_ms = round(
                         (perf_counter() - generation_started_at) * 1000, 3
                     )
+                    summary_model_name = self.model_name
                     logger.info(f"Generated summary for video {video_id}")
                 except Exception as e:
                     summary_generation_ms = round(
@@ -168,14 +181,24 @@ class YouTubeSummarizer:
                     if not (include_transcript and allow_summary_failure):
                         raise
 
+            if summary:
+                if not summary_model_name:
+                    summary_model_status = "unknown"
+                elif summary_model_name == self.model_name:
+                    summary_model_status = "current"
+                else:
+                    summary_model_status = "stale"
+
             # Save summary if requested and newly generated
             if save_to_file and summary and not summary_loaded_from_cache:
+                summary_metadata = dict(metadata or {})
+                summary_metadata["model_name"] = self.model_name
                 self.file_handler.save_summary(
                     video_id,
                     video_lang,
                     requested_summary_language,
                     summary,
-                    metadata,
+                    summary_metadata,
                 )
                 logger.info(f"Saved summary for video {video_id}")
 
@@ -194,6 +217,10 @@ class YouTubeSummarizer:
                 transcript_duration_ms=transcript_stats["duration_ms"],
                 transcript_chars=transcript_stats["transcript_chars"],
                 summary_cache_hit=summary_loaded_from_cache,
+                summary_model_name=summary_model_name,
+                current_model_name=self.model_name,
+                summary_model_status=summary_model_status,
+                force_regenerate=force_regenerate,
                 summary_generation_ms=summary_generation_ms,
                 summary_chars=len(summary) if summary else 0,
                 summary_saved=bool(
@@ -212,6 +239,10 @@ class YouTubeSummarizer:
                     "transcript": transcript,
                     "summary": summary,
                     "summary_error": summary_error,
+                    "summary_cache_hit": summary_loaded_from_cache,
+                    "summary_model_name": summary_model_name,
+                    "current_model_name": self.model_name,
+                    "summary_model_status": summary_model_status,
                 }
 
             if summary is None:
@@ -227,6 +258,8 @@ class YouTubeSummarizer:
                 "summary_request_failed",
                 video_id=video_id,
                 requested_summary_language=requested_summary_language,
+                current_model_name=self.model_name,
+                force_regenerate=force_regenerate,
                 error=str(e),
                 error_type=type(e).__name__,
                 total_duration_ms=total_ms,

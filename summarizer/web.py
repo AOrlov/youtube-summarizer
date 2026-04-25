@@ -154,6 +154,7 @@ def summarize():
         data = flask.request.get_json(silent=True) or {}
         video_url = data.get("video_url")
         summary_language = data.get("summary_language")
+        force_regenerate = data.get("force_regenerate") is True
         video_id = url_validator.extract_video_id(video_url) if video_url else None
 
         if not video_url:
@@ -197,6 +198,7 @@ def summarize():
             include_transcript=True,
             allow_summary_failure=True,
             summary_language=summary_language,
+            force_regenerate=force_regenerate,
         )
 
         status = "success" if result.get("summary") else "partial_success"
@@ -215,6 +217,11 @@ def summarize():
             "language": transcript_language,
             "video_id": result.get("video_id"),
             "summary_error": result.get("summary_error"),
+            "summary_cache_hit": result.get("summary_cache_hit"),
+            "summary_model_name": result.get("summary_model_name"),
+            "current_model_name": result.get("current_model_name")
+            or config.gemini_model,
+            "summary_model_status": result.get("summary_model_status"),
             "status": status,
         }
 
@@ -234,6 +241,11 @@ def summarize():
             status_code=200,
             summary_available=bool(response_payload["summary"]),
             transcript_available=bool(response_payload["transcript"]),
+            summary_cache_hit=response_payload["summary_cache_hit"],
+            summary_model_name=response_payload["summary_model_name"],
+            current_model_name=response_payload["current_model_name"],
+            summary_model_status=response_payload["summary_model_status"],
+            force_regenerate=force_regenerate,
             request_duration_ms=request_duration_ms,
         )
 

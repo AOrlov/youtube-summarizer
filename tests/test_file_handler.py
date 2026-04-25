@@ -51,6 +51,43 @@ class FakeGeminiSummarizer:
         return f"{summary_language} summary"
 
 
+def make_summarizer(monkeypatch, tmp_path, model_name="gemini-model"):
+    fake_url_validator = FakeURLValidator()
+    fake_transcript_extractor = FakeTranscriptExtractor(
+        api_key="youtube-key",
+        cache_dir=str(tmp_path / "transcripts"),
+    )
+    fake_gemini_summarizer = FakeGeminiSummarizer(
+        api_key="gemini-key",
+        model_name=model_name,
+    )
+
+    monkeypatch.setattr(
+        app_module,
+        "YouTubeURLValidator",
+        lambda: fake_url_validator,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "YouTubeTranscriptExtractor",
+        lambda api_key, cache_dir: fake_transcript_extractor,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "GeminiSummarizer",
+        lambda api_key, model_name: fake_gemini_summarizer,
+    )
+
+    summarizer = app_module.YouTubeSummarizer(
+        gemini_api_key="gemini-key",
+        model_name=model_name,
+        output_dir=str(tmp_path),
+        youtube_api_key="youtube-key",
+        transcript_cache_dir=str(tmp_path / "transcripts"),
+    )
+    return summarizer, fake_transcript_extractor, fake_gemini_summarizer
+
+
 def test_save_summary_records_both_languages_in_filename_and_metadata(tmp_path):
     handler = FileHandler(str(tmp_path))
 
@@ -59,7 +96,7 @@ def test_save_summary_records_both_languages_in_filename_and_metadata(tmp_path):
         "en",
         "ru",
         "Summary text",
-        metadata={"title": "Example"},
+        metadata={"title": "Example", "model_name": "gemini-model"},
     )
 
     assert saved_path.name.startswith("summary_video123_en_ru_")
@@ -68,8 +105,43 @@ def test_save_summary_records_both_languages_in_filename_and_metadata(tmp_path):
     content = saved_path.read_text(encoding="utf-8")
     assert "Summary text" in content
     assert "- **title**: Example" in content
+    assert "- **model_name**: gemini-model" in content
     assert "- **transcript_language**: en" in content
     assert "- **summary_language**: ru" in content
+
+
+def test_load_summary_record_returns_body_and_metadata(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    summary_path = handler.save_summary(
+        "video123",
+        "en",
+        "ru",
+        "Summary body",
+        metadata={"title": "Example", "model_name": "gemini-model"},
+    )
+
+    summary_record = handler.load_summary_record(summary_path)
+
+    assert summary_record == {
+        "summary": "Summary body",
+        "metadata": {
+            "title": "Example",
+            "model_name": "gemini-model",
+            "transcript_language": "en",
+            "summary_language": "ru",
+        },
+    }
+
+
+def test_load_summary_record_returns_empty_metadata_for_plain_legacy_file(tmp_path):
+    handler = FileHandler(str(tmp_path))
+    summary_path = tmp_path / "summary_video123_en_20260101_010101.md"
+    summary_path.write_text("Legacy summary", encoding="utf-8")
+
+    assert handler.load_summary_record(summary_path) == {
+        "summary": "Legacy summary",
+        "metadata": {},
+    }
 
 
 def test_get_summary_path_distinguishes_summary_language(tmp_path):
@@ -219,3 +291,100 @@ def test_summarizer_cache_separates_transcript_and_summary_languages(
         next(tmp_path.glob("summary_video123_en_ru_*.md")).name,
     ]
     assert fake_transcript_extractor.cache_dir == str(tmp_path / "transcripts")
+
+
+def test_summarizer_returns_model_metadata_for_generated_summary(monkeypatch, tmp_path):
+    summarizer, _, fake_gemini_summarizer = make_summarizer(monkeypatch, tmp_path)
+
+    result = summarizer.summarize_video(
+        video_url="https://youtube.com/watch?v=dQw4w9WgXcQ",
+        save_to_file=True,
+        include_transcript=True,
+        summary_language="en",
+    )
+
+    assert result["summary"] == "en summary"
+    assert result["summary_cache_hit"] is False
+    assert result["summary_model_name"] == "gemini-model"
+    assert result["current_model_name"] == "gemini-model"
+    assert result["summary_model_status"] == "current"
+    assert len(fake_gemini_summarizer.calls) == 1
+    saved_summary = next(tmp_path.glob("summary_video123_en_en_*.md"))
+    assert "- **model_name**: gemini-model" in saved_summary.read_text(encoding="utf-8")
+
+
+def test_summarizer_returns_unknown_model_status_for_legacy_cached_summary(
+    monkeypatch, tmp_path
+):
+    cached_path = tmp_path / "summary_video123_en_en_20260101_010101.md"
+    cached_path.write_text(
+        "## Summary\nCached summary\n\n## Metadata\n- **summary_language**: en\n",
+        encoding="utf-8",
+    )
+    summarizer, _, fake_gemini_summarizer = make_summarizer(monkeypatch, tmp_path)
+
+    result = summarizer.summarize_video(
+        video_url="https://youtube.com/watch?v=dQw4w9WgXcQ",
+        save_to_file=True,
+        include_transcript=True,
+        summary_language="en",
+    )
+
+    assert result["summary"] == "Cached summary"
+    assert result["summary_cache_hit"] is True
+    assert result["summary_model_name"] is None
+    assert result["current_model_name"] == "gemini-model"
+    assert result["summary_model_status"] == "unknown"
+    assert fake_gemini_summarizer.calls == []
+
+
+def test_summarizer_returns_stale_model_status_for_old_model_cached_summary(
+    monkeypatch, tmp_path
+):
+    cached_path = tmp_path / "summary_video123_en_en_20260101_010101.md"
+    cached_path.write_text(
+        "## Summary\nCached summary\n\n## Metadata\n"
+        "- **summary_language**: en\n"
+        "- **model_name**: gemini-old\n",
+        encoding="utf-8",
+    )
+    summarizer, _, fake_gemini_summarizer = make_summarizer(monkeypatch, tmp_path)
+
+    result = summarizer.summarize_video(
+        video_url="https://youtube.com/watch?v=dQw4w9WgXcQ",
+        save_to_file=True,
+        include_transcript=True,
+        summary_language="en",
+    )
+
+    assert result["summary"] == "Cached summary"
+    assert result["summary_cache_hit"] is True
+    assert result["summary_model_name"] == "gemini-old"
+    assert result["current_model_name"] == "gemini-model"
+    assert result["summary_model_status"] == "stale"
+    assert fake_gemini_summarizer.calls == []
+
+
+def test_summarizer_force_regenerate_bypasses_cached_summary(monkeypatch, tmp_path):
+    cached_path = tmp_path / "summary_video123_en_en_20260101_010101.md"
+    cached_path.write_text(
+        "## Summary\nCached summary\n\n## Metadata\n"
+        "- **summary_language**: en\n"
+        "- **model_name**: gemini-old\n",
+        encoding="utf-8",
+    )
+    summarizer, _, fake_gemini_summarizer = make_summarizer(monkeypatch, tmp_path)
+
+    result = summarizer.summarize_video(
+        video_url="https://youtube.com/watch?v=dQw4w9WgXcQ",
+        save_to_file=True,
+        include_transcript=True,
+        summary_language="en",
+        force_regenerate=True,
+    )
+
+    assert result["summary"] == "en summary"
+    assert result["summary_cache_hit"] is False
+    assert result["summary_model_name"] == "gemini-model"
+    assert result["summary_model_status"] == "current"
+    assert len(fake_gemini_summarizer.calls) == 1
