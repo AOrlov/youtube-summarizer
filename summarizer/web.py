@@ -143,6 +143,7 @@ def index(path):
         "index.html",
         allow_query_autosubmit=not path,
         default_summary_language=requested_summary_language,
+        model_name=config.gemini_model,
         summary_language_options=SUMMARY_LANGUAGE_OPTIONS,
     )
 
